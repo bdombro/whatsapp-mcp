@@ -1,23 +1,21 @@
-# WhatsApp MCP Server
+# MCP Bridge
 
-> This app was originally forked from https://github.com/lharries/whatsapp-mcp.git to merge outstanding bugs PRs and to add a feature for text archiving. The text archiving feature is useful for chatbots to index on.
+A pluggable [Model Context Protocol](https://modelcontextprotocol.io/) server that gives AI assistants access to personal data sources. Currently supports **WhatsApp** — search/read messages, search contacts, send messages — with the architecture ready for additional sources (Gmail, Google Drive, etc.).
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server for WhatsApp. Search and read your personal WhatsApp messages (including media), search contacts, and send messages to individuals or groups — all through an AI assistant like Claude or Cursor.
+Data is stored locally in SQLite and only sent to an LLM when accessed through MCP tools. Each data source registers its own namespaced tools (e.g. `whatsapp_list_chats`, `whatsapp_send_message`).
 
-It connects to your **personal WhatsApp account** via the WhatsApp web multidevice API (using [whatsmeow](https://github.com/tulir/whatsmeow)). Messages are stored locally in SQLite and only sent to an LLM when accessed through MCP tools.
-
-> *Caution:* as with many MCP servers, the WhatsApp MCP is subject to [the lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). This means that project injection could lead to private data exfiltration.
+> *Caution:* as with many MCP servers, this is subject to [the lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). Project injection could lead to private data exfiltration.
 
 ## Architecture
 
-A single Go binary (`whatsapp-cli`) handles everything: WhatsApp connection, message storage, REST API, and the MCP server. No Python runtime required.
+A single Go binary (`whatsapp-cli`) with a pluggable `DataSource` interface. Each source owns its tools, storage, and lifecycle.
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| Core | `whatsapp-cli core` | Connects to WhatsApp, stores messages in SQLite, exposes a REST API for sending/downloading |
-| MCP  | `whatsapp-cli mcp`  | MCP server over stdio for AI assistants. Reads from SQLite directly, sends via the core daemon's REST API |
+| Core | `whatsapp-cli core` | WhatsApp connection daemon: stores messages in SQLite, exposes a REST API |
+| MCP  | `whatsapp-cli mcp`  | MCP server over stdio. Loads all enabled sources and registers their tools |
 
-Data flows: Claude/Cursor talks MCP (stdio) to `whatsapp-cli mcp`, which reads from SQLite for queries and calls the core daemon's HTTP API for sends and media downloads. The core daemon maintains the WhatsApp connection and keeps the database current.
+Data flows: Claude/Cursor talks MCP (stdio) to `whatsapp-cli mcp`, which loads each data source. Read tools query local SQLite directly; write tools proxy through the source's backend (e.g. WhatsApp core daemon REST API).
 
 See the [product spec](docs/spec.md) for full details.
 

@@ -177,19 +177,19 @@ func callToolRaw(t *testing.T, s *server.MCPServer, name string, args map[string
 
 func TestMCP_GetChat_missingArg(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callToolRaw(t, s, "get_chat", map[string]interface{}{})
+	text := callToolRaw(t, s, "whatsapp_get_chat", map[string]interface{}{})
 	requireContains(t, text, "not found")
 }
 
 func TestMCP_GetDirectChat_notFound(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callToolRaw(t, s, "get_direct_chat_by_contact", map[string]interface{}{"sender_phone_number": "99999999"})
+	text := callToolRaw(t, s, "whatsapp_get_direct_chat_by_contact", map[string]interface{}{"sender_phone_number": "99999999"})
 	requireContains(t, text, "no direct chat")
 }
 
 func TestMCP_SendMessage_missingArgs(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callToolRaw(t, s, "send_message", map[string]interface{}{})
+	text := callToolRaw(t, s, "whatsapp_send_message", map[string]interface{}{})
 	requireContains(t, text, "success")
 }
 

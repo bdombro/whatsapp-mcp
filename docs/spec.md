@@ -1,6 +1,6 @@
-# WhatsApp CLI — Product Spec
+# Product Spec
 
-The WhatsApp CLI is a single Go binary that connects to WhatsApp's web multidevice API via [whatsmeow](https://github.com/tulir/whatsmeow), stores messages locally in SQLite, exposes a REST API for sending/downloading, and provides a built-in [MCP](https://modelcontextprotocol.io/) server for AI assistants. No Python runtime is required.
+A single Go binary that provides a pluggable [MCP](https://modelcontextprotocol.io/) server for AI assistants to access personal data sources. Currently supports WhatsApp (via [whatsmeow](https://github.com/tulir/whatsmeow)), with the architecture designed to support additional sources like Gmail, Google Drive, and others.
 
 ## Building
 
@@ -57,6 +57,31 @@ Configure in your AI client:
 
 For **Claude Desktop**: save to `~/Library/Application Support/Claude/claude_desktop_config.json`
 For **Cursor**: save to `~/.cursor/mcp.json`
+
+## Multi-Source Architecture
+
+The MCP server loads data sources via the `DataSource` interface. Each source registers its own MCP tools, namespaced with a prefix (e.g. `whatsapp_`, `gmail_`, `gdrive_`). This allows multiple sources to coexist in a single MCP server without tool name collisions.
+
+```go
+type DataSource interface {
+    Name() string                          // prefix for tool names (e.g. "whatsapp")
+    Description() string                   // human label (e.g. "WhatsApp")
+    RegisterTools(s *server.MCPServer)     // register all tools
+    Close() error                          // release resources
+}
+```
+
+`LoadSources()` in `source.go` returns all enabled sources. To add a new source:
+
+1. Create `source_<name>.go` implementing `DataSource`
+2. Create `<name>_service.go` with the source's query/write logic
+3. Add it to `LoadSources()`
+
+Current sources:
+
+| Source | Prefix | File | Description |
+|--------|--------|------|-------------|
+| WhatsApp | `whatsapp_` | `source_whatsapp.go` | Messages, chats, contacts via local SQLite + REST API |
 
 ### Daemon Management
 
@@ -194,43 +219,45 @@ Download media from a previously received message.
 
 ## MCP Tools
 
-The MCP server uses [mcp-go](https://github.com/mark3labs/mcp-go) as the framework. Communication is over stdio (JSON-RPC 2.0).
+The MCP server uses [mcp-go](https://github.com/mark3labs/mcp-go) as the framework. Communication is over stdio (JSON-RPC 2.0). All tool names are prefixed with their source name (e.g. `whatsapp_`).
+
+### WhatsApp Tools
 
 **Read path**: Queries `messages.db` and `whatsapp.db` directly via SQLite. The core daemon does not need to be running for read-only operations.
 
 **Write path**: Sending messages and downloading media go through the core daemon's REST API at `http://localhost:8080/api`. The core daemon must be running.
 
-### Contact & Chat Discovery
+#### Contact & Chat Discovery
 
 | Tool | Description |
 |------|-------------|
-| `search_contacts` | Search contacts by name or phone number. Queries both the local `chats` table and `whatsmeow_contacts` in `whatsapp.db` for broader coverage. Excludes group JIDs. |
-| `list_chats` | List chats with optional fuzzy search by chat name or participant name. When a query is provided, uses case-insensitive substring matching plus word-level similarity (threshold 0.6) on chat names, and also searches `whatsmeow_contacts` for matching participant names to find groups where that person is a member. |
-| `get_chat` | Get a single chat by JID with optional last message. |
-| `get_direct_chat_by_contact` | Find the direct (non-group) chat for a given phone number. |
-| `get_contact_chats` | List all chats (including groups) where a contact appears as sender. |
+| `whatsapp_search_contacts` | Search contacts by name or phone number. Queries both the local `chats` table and `whatsmeow_contacts` in `whatsapp.db` for broader coverage. Excludes group JIDs. |
+| `whatsapp_list_chats` | List chats with optional fuzzy search by chat name or participant name. When a query is provided, uses case-insensitive substring matching plus word-level similarity (threshold 0.6) on chat names, and also searches `whatsmeow_contacts` for matching participant names to find groups where that person is a member. |
+| `whatsapp_get_chat` | Get a single chat by JID with optional last message. |
+| `whatsapp_get_direct_chat_by_contact` | Find the direct (non-group) chat for a given phone number. |
+| `whatsapp_get_contact_chats` | List all chats (including groups) where a contact appears as sender. |
 
-### Message Reading
-
-| Tool | Description |
-|------|-------------|
-| `list_messages` | Search and filter messages by time range, sender, chat JID, or text content. When a query is provided, uses BM25 keyword search (FTS5) for relevance-ranked results. Supports pagination and optional surrounding context per message. |
-| `get_message_context` | Get messages before and after a specific message ID within the same chat. |
-| `get_last_interaction` | Get the most recent message involving a contact, returned as a formatted string. |
-
-### Sending
+#### Message Reading
 
 | Tool | Description |
 |------|-------------|
-| `send_message` | Send a text message to a phone number or group JID. Routes through the core daemon's `/api/send` endpoint. |
-| `send_file` | Send a local file (image, video, document) as a media message. The file must be accessible on the machine running the server. |
-| `send_audio_message` | Send an audio file as a playable WhatsApp voice message. Non-ogg files require ffmpeg for conversion. |
+| `whatsapp_list_messages` | Search and filter messages by time range, sender, chat JID, or text content. When a query is provided, uses BM25 keyword search (FTS5) for relevance-ranked results. Supports pagination and optional surrounding context per message. |
+| `whatsapp_get_message_context` | Get messages before and after a specific message ID within the same chat. |
+| `whatsapp_get_last_interaction` | Get the most recent message involving a contact, returned as a formatted string. |
 
-### Media
+#### Sending
 
 | Tool | Description |
 |------|-------------|
-| `download_media` | Download media from a received message by `message_id` and `chat_jid`. Routes through the core daemon's `/api/download` endpoint. Returns the local file path. |
+| `whatsapp_send_message` | Send a text message to a phone number or group JID. Routes through the core daemon's `/api/send` endpoint. |
+| `whatsapp_send_file` | Send a local file (image, video, document) as a media message. The file must be accessible on the machine running the server. |
+| `whatsapp_send_audio_message` | Send an audio file as a playable WhatsApp voice message. Non-ogg files require ffmpeg for conversion. |
+
+#### Media
+
+| Tool | Description |
+|------|-------------|
+| `whatsapp_download_media` | Download media from a received message by `message_id` and `chat_jid`. Routes through the core daemon's `/api/download` endpoint. Returns the local file path. |
 
 ---
 
@@ -238,13 +265,13 @@ The MCP server uses [mcp-go](https://github.com/mark3labs/mcp-go) as the framewo
 
 ### BM25 Keyword Search (FTS5)
 
-When `list_messages` is called with a `query` parameter, the server uses SQLite's FTS5 full-text search engine with BM25 scoring. The `messages_fts` virtual table is maintained via triggers so the index is always in sync. FTS5 provides tokenized keyword matching, implicit AND of terms, and TF-IDF-based relevance ranking.
+When `whatsapp_list_messages` is called with a `query` parameter, the server uses SQLite's FTS5 full-text search engine with BM25 scoring. The `messages_fts` virtual table is maintained via triggers so the index is always in sync. FTS5 provides tokenized keyword matching, implicit AND of terms, and TF-IDF-based relevance ranking.
 
-Without a `query` parameter, `list_messages` falls back to chronological listing with optional filters.
+Without a `query` parameter, `whatsapp_list_messages` falls back to chronological listing with optional filters.
 
 ### Fuzzy Chat & Participant Search
 
-The `list_chats` tool supports fuzzy search across two dimensions when a query is provided:
+The `whatsapp_list_chats` tool supports fuzzy search across two dimensions when a query is provided:
 
 1. **Chat name matching** — all chat names are compared against the query using case-insensitive substring matching followed by word-level fuzzy matching (LCS-based similarity ratio with a 0.6 threshold). This handles typos like "famly" matching "Family" and partial words like "birth" matching "Birthday Group".
 

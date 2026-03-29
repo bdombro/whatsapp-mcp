@@ -29,10 +29,10 @@ func buildTestMCPServer(t *testing.T) (*server.MCPServer, *httptest.Server) {
 	t.Cleanup(apiSrv.Close)
 
 	store := newTestStoreWithContacts(t)
-	svc := NewMCPService(store, apiSrv.URL)
+	ws := NewWhatsAppSourceFromStore(store, apiSrv.URL)
 
-	s := server.NewMCPServer("whatsapp-test", "1.0.0", server.WithToolCapabilities(false))
-	registerMCPTools(s, svc)
+	s := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
+	ws.RegisterTools(s)
 	return s, apiSrv
 }
 
@@ -40,7 +40,6 @@ func buildTestMCPServer(t *testing.T) (*server.MCPServer, *httptest.Server) {
 func callTool(t *testing.T, s *server.MCPServer, name string, args map[string]interface{}) string {
 	t.Helper()
 
-	// Ensure initialized
 	initMsg, _ := json.Marshal(map[string]interface{}{
 		"jsonrpc": "2.0", "id": 0, "method": "initialize",
 		"params": map[string]interface{}{
@@ -93,73 +92,73 @@ func extractText(t *testing.T, raw json.RawMessage) string {
 
 func TestMCP_SearchContacts(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "search_contacts", map[string]interface{}{"query": "Alice"})
+	text := callTool(t, s, "whatsapp_search_contacts", map[string]interface{}{"query": "Alice"})
 	requireContains(t, text, "Alice")
 }
 
 func TestMCP_ListChats(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "list_chats", map[string]interface{}{})
+	text := callTool(t, s, "whatsapp_list_chats", map[string]interface{}{})
 	requireContains(t, text, "group1@g.us")
 }
 
 func TestMCP_ListChats_fuzzyQuery(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "list_chats", map[string]interface{}{"query": "Famly"})
+	text := callTool(t, s, "whatsapp_list_chats", map[string]interface{}{"query": "Famly"})
 	requireContains(t, text, "Family Chat")
 }
 
 func TestMCP_ListChats_participantSearch(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "list_chats", map[string]interface{}{"query": "Charlie"})
+	text := callTool(t, s, "whatsapp_list_chats", map[string]interface{}{"query": "Charlie"})
 	requireContains(t, text, "group2@g.us")
 }
 
 func TestMCP_GetChat(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_chat", map[string]interface{}{"chat_jid": "group1@g.us"})
+	text := callTool(t, s, "whatsapp_get_chat", map[string]interface{}{"chat_jid": "group1@g.us"})
 	requireContains(t, text, "Family Chat")
 }
 
 func TestMCP_GetChat_notFound(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_chat", map[string]interface{}{"chat_jid": "nonexistent@s.whatsapp.net"})
+	text := callTool(t, s, "whatsapp_get_chat", map[string]interface{}{"chat_jid": "nonexistent@s.whatsapp.net"})
 	requireContains(t, text, "not found")
 }
 
 func TestMCP_GetDirectChatByContact(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_direct_chat_by_contact", map[string]interface{}{"sender_phone_number": "11111"})
+	text := callTool(t, s, "whatsapp_get_direct_chat_by_contact", map[string]interface{}{"sender_phone_number": "11111"})
 	requireContains(t, text, "Alice Smith")
 }
 
 func TestMCP_GetContactChats(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_contact_chats", map[string]interface{}{"jid": "11111"})
+	text := callTool(t, s, "whatsapp_get_contact_chats", map[string]interface{}{"jid": "11111"})
 	requireContains(t, text, "11111@s.whatsapp.net")
 }
 
 func TestMCP_ListMessages(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "list_messages", map[string]interface{}{"chat_jid": "group1@g.us"})
+	text := callTool(t, s, "whatsapp_list_messages", map[string]interface{}{"chat_jid": "group1@g.us"})
 	requireContains(t, text, "dinner")
 }
 
 func TestMCP_ListMessages_search(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "list_messages", map[string]interface{}{"query": "meeting"})
+	text := callTool(t, s, "whatsapp_list_messages", map[string]interface{}{"query": "meeting"})
 	requireContains(t, text, "Meeting at 3pm")
 }
 
 func TestMCP_GetMessageContext(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_message_context", map[string]interface{}{"message_id": "m4"})
+	text := callTool(t, s, "whatsapp_get_message_context", map[string]interface{}{"message_id": "m4"})
 	requireContains(t, text, "m4")
 }
 
 func TestMCP_GetLastInteraction(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "get_last_interaction", map[string]interface{}{"jid": "11111@s.whatsapp.net"})
+	text := callTool(t, s, "whatsapp_get_last_interaction", map[string]interface{}{"jid": "11111@s.whatsapp.net"})
 	if text == "" {
 		t.Error("expected non-empty last interaction")
 	}
@@ -167,25 +166,25 @@ func TestMCP_GetLastInteraction(t *testing.T) {
 
 func TestMCP_SendMessage(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "send_message", map[string]interface{}{"recipient": "11111", "message": "hi"})
+	text := callTool(t, s, "whatsapp_send_message", map[string]interface{}{"recipient": "11111", "message": "hi"})
 	requireContains(t, text, "success")
 }
 
 func TestMCP_SendFile(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "send_file", map[string]interface{}{"recipient": "11111", "media_path": "/tmp/test.jpg"})
+	text := callTool(t, s, "whatsapp_send_file", map[string]interface{}{"recipient": "11111", "media_path": "/tmp/test.jpg"})
 	requireContains(t, text, "success")
 }
 
 func TestMCP_SendAudioMessage(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "send_audio_message", map[string]interface{}{"recipient": "11111", "media_path": "/tmp/test.ogg"})
+	text := callTool(t, s, "whatsapp_send_audio_message", map[string]interface{}{"recipient": "11111", "media_path": "/tmp/test.ogg"})
 	requireContains(t, text, "success")
 }
 
 func TestMCP_DownloadMedia(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
-	text := callTool(t, s, "download_media", map[string]interface{}{"message_id": "m6", "chat_jid": "22222@s.whatsapp.net"})
+	text := callTool(t, s, "whatsapp_download_media", map[string]interface{}{"message_id": "m6", "chat_jid": "22222@s.whatsapp.net"})
 	requireContains(t, text, "file_path")
 }
 
@@ -194,14 +193,11 @@ func TestMCP_DownloadMedia(t *testing.T) {
 func TestMCP_ToolsListContainsAllTools(t *testing.T) {
 	s, _ := buildTestMCPServer(t)
 
-	msg := mustMarshalToolCall("", nil)
-	// Use tools/list method
 	listMsg, _ := json.Marshal(map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
 		"method":  "tools/list",
 	})
-	_ = msg
 
 	initMsg, _ := json.Marshal(map[string]interface{}{
 		"jsonrpc": "2.0", "id": 0, "method": "initialize",
@@ -226,10 +222,11 @@ func TestMCP_ToolsListContainsAllTools(t *testing.T) {
 	json.Unmarshal(result, &resp)
 
 	expectedTools := []string{
-		"search_contacts", "list_chats", "get_chat", "get_direct_chat_by_contact",
-		"get_contact_chats", "list_messages", "get_message_context",
-		"get_last_interaction", "send_message", "send_file",
-		"send_audio_message", "download_media",
+		"whatsapp_search_contacts", "whatsapp_list_chats", "whatsapp_get_chat",
+		"whatsapp_get_direct_chat_by_contact", "whatsapp_get_contact_chats",
+		"whatsapp_list_messages", "whatsapp_get_message_context",
+		"whatsapp_get_last_interaction", "whatsapp_send_message", "whatsapp_send_file",
+		"whatsapp_send_audio_message", "whatsapp_download_media",
 	}
 
 	toolNames := make(map[string]bool)
@@ -241,4 +238,21 @@ func TestMCP_ToolsListContainsAllTools(t *testing.T) {
 			t.Errorf("missing tool: %s", name)
 		}
 	}
+}
+
+// ---------- DataSource interface ----------
+
+func TestWhatsAppSource_interface(t *testing.T) {
+	store := newTestStore(t)
+	ws := NewWhatsAppSourceFromStore(store, "http://localhost:1")
+	defer ws.Close()
+
+	if ws.Name() != "whatsapp" {
+		t.Errorf("expected name 'whatsapp', got %q", ws.Name())
+	}
+	if ws.Description() != "WhatsApp" {
+		t.Errorf("expected description 'WhatsApp', got %q", ws.Description())
+	}
+
+	var _ DataSource = ws
 }
