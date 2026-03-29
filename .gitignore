@@ -1,0 +1,5 @@
+*.db
+*.txt
+claude_desktop_config.json
+whatsapp.log
+*.bin
