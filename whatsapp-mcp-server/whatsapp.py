@@ -1,13 +1,15 @@
 import sqlite3
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from difflib import SequenceMatcher
+from typing import Optional, List, Tuple, Set
 import os.path
 import requests
 import json
 import audio
 
 MESSAGES_DB_PATH = os.path.join(os.path.expanduser('~'), '.local', 'share', 'whatsapp-cli', 'messages.db')
+WHATSAPP_DB_PATH = os.path.join(os.path.expanduser('~'), '.local', 'share', 'whatsapp-cli', 'whatsapp.db')
 WHATSAPP_API_BASE_URL = "http://localhost:8080/api"
 
 @dataclass
@@ -133,18 +135,35 @@ def list_messages(
     context_before: int = 1,
     context_after: int = 1
 ) -> List[Message]:
-    """Get messages matching the specified criteria with optional context."""
+    """Get messages matching the specified criteria with optional context.
+    
+    When a query is provided, uses hybrid search (BM25 + vector similarity)
+    to find the most relevant messages ranked by combined score. Without a
+    query, falls back to chronological listing with optional filters.
+    """
+    # When a text query is given, use hybrid search for relevance-ranked results
+    if query:
+        return _hybrid_message_search(
+            query=query,
+            limit=limit,
+            chat_jid=chat_jid,
+            after=after,
+            before=before,
+            sender_phone_number=sender_phone_number,
+            include_context=include_context,
+            context_before=context_before,
+            context_after=context_after,
+        )
+
     try:
         conn = sqlite3.connect(MESSAGES_DB_PATH)
         cursor = conn.cursor()
         
-        # Build base query
         query_parts = ["SELECT messages.timestamp, messages.sender, chats.name, messages.content, messages.is_from_me, chats.jid, messages.id, messages.media_type FROM messages"]
         query_parts.append("JOIN chats ON messages.chat_jid = chats.jid")
         where_clauses = []
         params = []
         
-        # Add filters
         if after:
             try:
                 after = datetime.fromisoformat(after)
@@ -171,14 +190,9 @@ def list_messages(
             where_clauses.append("messages.chat_jid = ?")
             params.append(chat_jid)
             
-        if query:
-            where_clauses.append("LOWER(messages.content) LIKE LOWER(?)")
-            params.append(f"%{query}%")
-            
         if where_clauses:
             query_parts.append("WHERE " + " AND ".join(where_clauses))
             
-        # Add pagination
         offset = page * limit
         query_parts.append("ORDER BY messages.timestamp DESC")
         query_parts.append("LIMIT ? OFFSET ?")
@@ -202,7 +216,6 @@ def list_messages(
             result.append(message)
             
         if include_context and result:
-            # Add context for each message
             messages_with_context = []
             for msg in result:
                 context = get_message_context(msg.id, context_before, context_after)
@@ -212,7 +225,6 @@ def list_messages(
             
             return format_messages_list(messages_with_context, show_chat_info=True)
             
-        # Format and display messages without context
         return format_messages_list(result, show_chat_info=True)    
         
     except sqlite3.Error as e:
@@ -221,6 +233,76 @@ def list_messages(
     finally:
         if 'conn' in locals():
             conn.close()
+
+
+def _hybrid_message_search(
+    query: str,
+    limit: int = 20,
+    chat_jid: Optional[str] = None,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+    sender_phone_number: Optional[str] = None,
+    include_context: bool = True,
+    context_before: int = 1,
+    context_after: int = 1,
+):
+    """Relevance-ranked message search using hybrid BM25 + vector similarity."""
+    from search import hybrid_search
+
+    ranked = hybrid_search(
+        query=query,
+        limit=limit,
+        chat_jid=chat_jid,
+        after=after,
+        before=before,
+    )
+
+    if not ranked:
+        return format_messages_list([], show_chat_info=True)
+
+    conn = sqlite3.connect(MESSAGES_DB_PATH)
+    try:
+        result = []
+        for msg_id, msg_chat_jid, score in ranked:
+            row = conn.execute("""
+                SELECT messages.timestamp, messages.sender, chats.name, messages.content,
+                       messages.is_from_me, chats.jid, messages.id, messages.media_type
+                FROM messages
+                JOIN chats ON messages.chat_jid = chats.jid
+                WHERE messages.id = ? AND messages.chat_jid = ?
+            """, (msg_id, msg_chat_jid)).fetchone()
+
+            if not row:
+                continue
+
+            # Apply sender filter if specified (hybrid search doesn't filter by sender)
+            if sender_phone_number and row[1] != sender_phone_number:
+                continue
+
+            message = Message(
+                timestamp=datetime.fromisoformat(row[0]),
+                sender=row[1],
+                chat_name=row[2],
+                content=row[3],
+                is_from_me=row[4],
+                chat_jid=row[5],
+                id=row[6],
+                media_type=row[7]
+            )
+            result.append(message)
+
+        if include_context and result:
+            messages_with_context = []
+            for msg in result:
+                context = get_message_context(msg.id, context_before, context_after)
+                messages_with_context.extend(context.before)
+                messages_with_context.append(context.message)
+                messages_with_context.extend(context.after)
+            return format_messages_list(messages_with_context, show_chat_info=True)
+
+        return format_messages_list(result, show_chat_info=True)
+    finally:
+        conn.close()
 
 
 def get_message_context(
@@ -316,6 +398,64 @@ def get_message_context(
             conn.close()
 
 
+def _fuzzy_match(query: str, text: str, threshold: float = 0.6) -> bool:
+    """Case-insensitive fuzzy match: substring or word-level similarity."""
+    if not text:
+        return False
+    q, t = query.lower(), text.lower()
+    if q in t:
+        return True
+    if len(q) < 3:
+        return False
+    q_words = q.split()
+    t_words = t.split()
+    for qw in q_words:
+        if not any(qw in tw or SequenceMatcher(None, qw, tw).ratio() >= threshold for tw in t_words):
+            return False
+    return True
+
+
+def _find_chats_by_participant_name(query: str) -> Set[str]:
+    """Find chat JIDs where a participant's name fuzzy-matches the query.
+
+    Searches whatsmeow_contacts in whatsapp.db for matching names, then looks
+    up which groups those contacts belong to via group_participants, and also
+    includes their direct chat JIDs.
+    """
+    if not os.path.exists(WHATSAPP_DB_PATH):
+        return set()
+
+    result_jids: Set[str] = set()
+    try:
+        wa_conn = sqlite3.connect(f"file:{WHATSAPP_DB_PATH}?mode=ro", uri=True)
+        msg_conn = sqlite3.connect(f"file:{MESSAGES_DB_PATH}?mode=ro", uri=True)
+
+        contacts = wa_conn.execute(
+            "SELECT their_jid, full_name, push_name FROM whatsmeow_contacts"
+        ).fetchall()
+
+        matching_jids = set()
+        for their_jid, full_name, push_name in contacts:
+            if _fuzzy_match(query, full_name) or _fuzzy_match(query, push_name):
+                matching_jids.add(their_jid)
+
+        if matching_jids:
+            placeholders = ','.join(['?' for _ in matching_jids])
+            for row in msg_conn.execute(
+                f"SELECT DISTINCT group_jid FROM group_participants WHERE participant_jid IN ({placeholders})",
+                list(matching_jids),
+            ):
+                result_jids.add(row[0])
+            for jid in matching_jids:
+                result_jids.add(jid)
+
+        wa_conn.close()
+        msg_conn.close()
+    except sqlite3.Error:
+        pass
+    return result_jids
+
+
 def list_chats(
     query: Optional[str] = None,
     limit: int = 20,
@@ -323,12 +463,17 @@ def list_chats(
     include_last_message: bool = True,
     sort_by: str = "last_active"
 ) -> List[Chat]:
-    """Get chats matching the specified criteria."""
+    """Get chats matching the specified criteria.
+
+    When a query is provided, uses fuzzy matching on chat names and also
+    searches group participant names via whatsmeow_contacts so that e.g.
+    searching "Kevin" finds both the direct chat with Kevin and any group
+    where Kevin is a member.
+    """
     try:
         conn = sqlite3.connect(MESSAGES_DB_PATH)
         cursor = conn.cursor()
-        
-        # Build base query
+
         query_parts = ["""
             SELECT 
                 chats.jid,
@@ -339,35 +484,47 @@ def list_chats(
                 messages.is_from_me as last_is_from_me
             FROM chats
         """]
-        
+
         if include_last_message:
             query_parts.append("""
                 LEFT JOIN messages ON chats.jid = messages.chat_jid 
                 AND chats.last_message_time = messages.timestamp
             """)
-            
+
         where_clauses = []
         params = []
-        
+
         if query:
-            where_clauses.append("(LOWER(chats.name) LIKE LOWER(?) OR chats.jid LIKE ?)")
-            params.extend([f"%{query}%", f"%{query}%"])
-            
+            matching_jids: Set[str] = set()
+
+            all_chats = cursor.execute("SELECT jid, name FROM chats").fetchall()
+            for jid, name in all_chats:
+                if _fuzzy_match(query, name) or query.lower() in jid.lower():
+                    matching_jids.add(jid)
+
+            matching_jids.update(_find_chats_by_participant_name(query))
+
+            if not matching_jids:
+                conn.close()
+                return []
+
+            placeholders = ','.join(['?' for _ in matching_jids])
+            where_clauses.append(f"chats.jid IN ({placeholders})")
+            params.extend(list(matching_jids))
+
         if where_clauses:
             query_parts.append("WHERE " + " AND ".join(where_clauses))
-            
-        # Add sorting
+
         order_by = "chats.last_message_time DESC" if sort_by == "last_active" else "chats.name"
         query_parts.append(f"ORDER BY {order_by}")
-        
-        # Add pagination
-        offset = (page ) * limit
+
+        offset = page * limit
         query_parts.append("LIMIT ? OFFSET ?")
         params.extend([limit, offset])
-        
+
         cursor.execute(" ".join(query_parts), tuple(params))
         chats = cursor.fetchall()
-        
+
         result = []
         for chat_data in chats:
             chat = Chat(
@@ -379,9 +536,9 @@ def list_chats(
                 last_is_from_me=chat_data[5]
             )
             result.append(chat)
-            
+
         return result
-        
+
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         return []
@@ -391,39 +548,64 @@ def list_chats(
 
 
 def search_contacts(query: str) -> List[Contact]:
-    """Search contacts by name or phone number."""
+    """Search contacts by name or phone number.
+
+    Searches the local chats table and also the whatsmeow_contacts table
+    in whatsapp.db for broader coverage (push names, address-book names).
+    """
     try:
         conn = sqlite3.connect(MESSAGES_DB_PATH)
         cursor = conn.cursor()
-        
-        # Split query into characters to support partial matching
-        search_pattern = '%' +query + '%'
-        
+
+        search_pattern = f"%{query}%"
+
         cursor.execute("""
-            SELECT DISTINCT 
-                jid,
-                name
+            SELECT DISTINCT jid, name
             FROM chats
-            WHERE 
-                (LOWER(name) LIKE LOWER(?) OR LOWER(jid) LIKE LOWER(?))
+            WHERE (LOWER(name) LIKE LOWER(?) OR LOWER(jid) LIKE LOWER(?))
                 AND jid NOT LIKE '%@g.us'
             ORDER BY name, jid
             LIMIT 50
         """, (search_pattern, search_pattern))
-        
-        contacts = cursor.fetchall()
-        
-        result = []
-        for contact_data in contacts:
-            contact = Contact(
-                phone_number=contact_data[0].split('@')[0],
-                name=contact_data[1],
-                jid=contact_data[0]
-            )
-            result.append(contact)
-            
-        return result
-        
+
+        seen_jids: Set[str] = set()
+        result: List[Contact] = []
+
+        for jid, name in cursor.fetchall():
+            seen_jids.add(jid)
+            result.append(Contact(
+                phone_number=jid.split('@')[0],
+                name=name,
+                jid=jid,
+            ))
+
+        if os.path.exists(WHATSAPP_DB_PATH):
+            try:
+                wa_conn = sqlite3.connect(f"file:{WHATSAPP_DB_PATH}?mode=ro", uri=True)
+                wa_contacts = wa_conn.execute("""
+                    SELECT their_jid, full_name, push_name
+                    FROM whatsmeow_contacts
+                    WHERE (LOWER(full_name) LIKE LOWER(?) OR LOWER(push_name) LIKE LOWER(?)
+                            OR LOWER(their_jid) LIKE LOWER(?))
+                        AND their_jid NOT LIKE '%@g.us'
+                    LIMIT 50
+                """, (search_pattern, search_pattern, search_pattern)).fetchall()
+
+                for their_jid, full_name, push_name in wa_contacts:
+                    if their_jid not in seen_jids:
+                        seen_jids.add(their_jid)
+                        result.append(Contact(
+                            phone_number=their_jid.split('@')[0],
+                            name=full_name or push_name,
+                            jid=their_jid,
+                        ))
+
+                wa_conn.close()
+            except sqlite3.Error:
+                pass
+
+        return result[:50]
+
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         return []

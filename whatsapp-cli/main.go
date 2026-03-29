@@ -685,12 +685,10 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  login [--relogin]   Log in to WhatsApp (scan QR code)")
 	fmt.Fprintln(os.Stderr, "  core                Start the WhatsApp connection and REST API")
-	fmt.Fprintln(os.Stderr, "  sync [flags]        Export messages to text files")
 	fmt.Fprintln(os.Stderr, "  info                Show install status and data locations")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Daemon:")
 	fmt.Fprintln(os.Stderr, "  install-daemon      Install core as a macOS LaunchAgent")
-	fmt.Fprintln(os.Stderr, "  install-cron        Install sync cron job (every 5 min)")
 	fmt.Fprintln(os.Stderr, "  start               Start the core daemon")
 	fmt.Fprintln(os.Stderr, "  stop                Stop the core daemon")
 	fmt.Fprintln(os.Stderr, "  restart             Restart the core daemon")
@@ -711,18 +709,11 @@ func main() {
 	args := os.Args[2:]
 
 	switch cmd {
-	case "sync":
-		requireLogin()
-		runSync(args)
-		return
 	case "login":
 		runLogin(args)
 		return
 	case "install-daemon":
 		runInstallDaemon()
-		return
-	case "install-cron":
-		runInstallCron()
 		return
 	case "uninstall":
 		runUninstall()

@@ -1,7 +1,7 @@
 build:
     #!/bin/bash
     cd whatsapp-cli
-    go build -o whatsapp-cli.bin .
+    go build -tags "sqlite_fts5" -o whatsapp-cli.bin .
 
 update: build
     #!/bin/bash
@@ -37,10 +37,9 @@ install: update
     sudo ln -sf /usr/local/lib/whatsapp-mcp-server/whatsapp-mcp-server.sh /usr/local/bin/whatsapp-mcp-server
     echo "Installed /usr/local/bin/whatsapp-mcp-server -> /usr/local/lib/whatsapp-mcp-server/"
 
-    # Install daemon and cron
+    # Install daemon
     whatsapp-cli login
     whatsapp-cli install-daemon
-    whatsapp-cli install-cron
 
     # Shell completions
     COMP_LINE='eval "$(whatsapp-cli completions zsh)"'
@@ -55,4 +54,3 @@ install: update
 reset:
     whatsapp-cli reset
     whatsapp-cli login
-    whatsapp-cli sync --from=2020.01.01

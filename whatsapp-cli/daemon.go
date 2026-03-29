@@ -17,10 +17,7 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
-const (
-	plistName  = "com.whatsapp-cli.core"
-	cronMarker = "whatsapp-cli sync"
-)
+const plistName = "com.whatsapp-cli.core"
 
 func plistPath() string {
 	home, _ := os.UserHomeDir()
@@ -187,6 +184,8 @@ func runLogin(args []string) {
 	}
 	client.Disconnect()
 
+	pumpSearchEmbeddings()
+
 	// Restart daemon if --relogin stopped it
 	if relogin {
 		plist := plistPath()
@@ -194,6 +193,28 @@ func runLogin(args []string) {
 			fmt.Println("Restarting core daemon...")
 			exec.Command("launchctl", "load", plist).Run()
 		}
+	}
+}
+
+// pumpSearchEmbeddings pre-computes vector embeddings for the MCP server's
+// hybrid search so the first query doesn't pay the cold-start cost.
+func pumpSearchEmbeddings() {
+	mcpDir := "/usr/local/lib/whatsapp-mcp-server"
+	if _, err := os.Stat(mcpDir); err != nil {
+		fmt.Println("Skipping search index (MCP server not installed)")
+		return
+	}
+	uvPath, err := exec.LookPath("uv")
+	if err != nil {
+		fmt.Println("Skipping search index (uv not found)")
+		return
+	}
+	fmt.Println("Building search index...")
+	cmd := exec.Command(uvPath, "--directory", mcpDir, "run", "python", "search.py")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Warning: search index build failed: %v\n", err)
 	}
 }
 
@@ -243,30 +264,6 @@ func runInstallDaemon() {
 	fmt.Printf("Logs: %s\n", logPath)
 }
 
-func runInstallCron() {
-	requireLogin()
-	binPath := installedBinPath()
-	cronCmd := fmt.Sprintf("*/5 * * * * %s sync --catchup", binPath)
-
-	existing, _ := exec.Command("crontab", "-l").Output()
-	var lines []string
-	for _, line := range strings.Split(string(existing), "\n") {
-		if line != "" && !strings.Contains(line, cronMarker) {
-			lines = append(lines, line)
-		}
-	}
-	lines = append(lines, cronCmd)
-	newCrontab := strings.Join(lines, "\n") + "\n"
-
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(newCrontab)
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error installing cron job: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Installed sync cron: %s\n", cronCmd)
-}
-
 func runStart() {
 	plist := requireDaemonInstalled()
 	exec.Command("launchctl", "unload", plist).Run()
@@ -296,7 +293,7 @@ func runRestart() {
 	fmt.Println("Restarted core daemon")
 }
 
-func removeDaemonAndCron() {
+func removeDaemon() {
 	plist := plistPath()
 	exec.Command("launchctl", "unload", plist).Run()
 	if err := os.Remove(plist); err != nil && !os.IsNotExist(err) {
@@ -304,26 +301,10 @@ func removeDaemonAndCron() {
 	} else if err == nil {
 		fmt.Println("Removed core daemon")
 	}
-
-	existing, _ := exec.Command("crontab", "-l").Output()
-	var lines []string
-	for _, line := range strings.Split(string(existing), "\n") {
-		if line != "" && !strings.Contains(line, cronMarker) {
-			lines = append(lines, line)
-		}
-	}
-	newCrontab := strings.Join(lines, "\n") + "\n"
-	if len(lines) == 0 {
-		newCrontab = ""
-	}
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(newCrontab)
-	cmd.Run()
-	fmt.Println("Removed sync cron job")
 }
 
 func runReset() {
-	removeDaemonAndCron()
+	removeDaemon()
 
 	dDir := dataDir()
 	if _, err := os.Stat(dDir); os.IsNotExist(err) {
@@ -380,15 +361,12 @@ func runUninstall() {
 
 func runInfo() {
 	dDir := dataDir()
-	chatsDir := filepath.Join(dDir, "chats")
 
-	// Header
 	fmt.Println("┌──────────────────────────────────────────┐")
 	fmt.Println("│           whatsapp-cli info              │")
 	fmt.Println("└──────────────────────────────────────────┘")
 	fmt.Println()
 
-	// Data directory
 	fmt.Println("📁 Data")
 	fmt.Printf("   Directory:  %s\n", dDir)
 	if info, err := os.Stat(dDir); err == nil && info.IsDir() {
@@ -396,23 +374,8 @@ func runInfo() {
 	} else {
 		fmt.Println("   Status:     not initialized (run 'whatsapp-cli login')")
 	}
-
-	// Chats folder
-	fmt.Printf("   Chats:      %s", chatsDir)
-	if entries, err := os.ReadDir(chatsDir); err == nil {
-		txtCount := 0
-		for _, e := range entries {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".txt") {
-				txtCount++
-			}
-		}
-		fmt.Printf(" (%d files)\n", txtCount)
-	} else {
-		fmt.Println(" (not created yet)")
-	}
 	fmt.Println()
 
-	// WhatsApp account
 	fmt.Println("👤 Account")
 	waDB := filepath.Join(dDir, "whatsapp.db")
 	if _, err := os.Stat(waDB); err == nil {
@@ -435,7 +398,6 @@ func runInfo() {
 		fmt.Println("   Logged in:  no session (run 'whatsapp-cli login')")
 	}
 
-	// Message database stats
 	msgDB := filepath.Join(dDir, "messages.db")
 	if _, err := os.Stat(msgDB); err == nil {
 		db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_busy_timeout=3000", msgDB))
@@ -453,7 +415,6 @@ func runInfo() {
 	}
 	fmt.Println()
 
-	// Core daemon
 	fmt.Println("⚙️  Core Daemon")
 	plist := plistPath()
 	if _, err := os.Stat(plist); err == nil {
@@ -470,32 +431,12 @@ func runInfo() {
 	} else {
 		fmt.Println("   Status:     not installed")
 	}
-	fmt.Println()
-
-	// Sync cron
-	fmt.Println("🔄 Sync Cron")
-	ctxCron, cancelCron := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelCron()
-	cronOut, _ := exec.CommandContext(ctxCron, "crontab", "-l").Output()
-	if strings.Contains(string(cronOut), cronMarker) {
-		for _, line := range strings.Split(string(cronOut), "\n") {
-			if strings.Contains(line, cronMarker) {
-				fmt.Printf("   Schedule:   %s\n", strings.TrimSpace(line))
-				break
-			}
-		}
-		fmt.Printf("   Logs:       %s\n", filepath.Join(dDir, "sync.log"))
-	} else {
-		fmt.Println("   Status:     not installed")
-	}
 }
 
 var commands = []string{
 	"core",
-	"sync",
 	"login",
 	"install-daemon",
-	"install-cron",
 	"uninstall",
 	"start",
 	"stop",
@@ -503,14 +444,6 @@ var commands = []string{
 	"reset",
 	"info",
 	"completions",
-}
-
-var syncFlags = []string{
-	"--catchup",
-	"--delete",
-	"--from=",
-	"--to=",
-	"--output=",
 }
 
 func runCompletions(shell string) {
@@ -536,9 +469,6 @@ func printBashCompletions() {
     fi
 
     case "$cmd" in
-        sync)
-            COMPREPLY=( $(compgen -W "` + strings.Join(syncFlags, " ") + `" -- "$cur") )
-            ;;
         completions)
             COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
             ;;
@@ -550,28 +480,19 @@ complete -o nospace -F _whatsapp_cli whatsapp-cli
 
 func printZshCompletions() {
 	fmt.Print(`_whatsapp_cli() {
-    local -a cmds sync_flags comp_args
+    local -a cmds comp_args
 
     cmds=(
         'core:Start the WhatsApp connection and REST API'
-        'sync:Export messages to text files'
         'login:Log in to WhatsApp (scan QR code)'
         'install-daemon:Install core daemon (macOS LaunchAgent)'
-        'install-cron:Install sync cron job'
-        'uninstall:Remove daemon, cron, data, and binaries'
+        'uninstall:Remove daemon, data, and binaries'
         'start:Start the core daemon'
         'stop:Stop the core daemon'
         'restart:Restart the core daemon'
-        'reset:Uninstall daemons and wipe all data'
+        'reset:Uninstall daemon and wipe all data'
         'info:Show install status and data locations'
         'completions:Print shell completions (bash or zsh)'
-    )
-    sync_flags=(
-        '--catchup:Catch up from last archived message'
-        '--delete:Delete archived messages in range'
-        '--from=:Start date YYYY.MM.DD or YYYY.MM.DD\:HH.MM'
-        '--to=:End date YYYY.MM.DD or YYYY.MM.DD\:HH.MM'
-        '--output=:Output directory'
     )
     comp_args=(
         'bash:Bash completions'
@@ -582,9 +503,6 @@ func printZshCompletions() {
         _describe -t commands 'command' cmds
     else
         case "${words[2]}" in
-            sync)
-                _describe -t flags 'sync flag' sync_flags
-                ;;
             completions)
                 _describe -t shells 'shell' comp_args
                 ;;

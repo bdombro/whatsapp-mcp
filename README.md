@@ -16,7 +16,7 @@ It connects to your **personal WhatsApp account** via the WhatsApp web multidevi
 
 | Component | Directory | Language | Description |
 |-----------|-----------|----------|-------------|
-| WhatsApp CLI | `whatsapp-cli/` | Go | Connects to WhatsApp, stores messages in SQLite, exposes a REST API for sending/downloading, and exports message history to text files via `sync`. See [spec](docs/whatsapp-cli-spec.md). |
+| WhatsApp CLI | `whatsapp-cli/` | Go | Connects to WhatsApp, stores messages in SQLite, exposes a REST API for sending/downloading. See [spec](docs/whatsapp-cli-spec.md). |
 | MCP Server | `whatsapp-mcp-server/` | Python | MCP tool interface for AI assistants. Reads from SQLite directly, sends via the CLI's HTTP API. See [spec](docs/whatsapp-mcp-server-spec.md). |
 
 Data flows: Claude/Cursor talks MCP (stdio) to the Python server, which reads from SQLite for queries and calls the Go CLI's HTTP API for sends and media downloads. The CLI maintains the WhatsApp connection and keeps the database current.
@@ -44,7 +44,7 @@ Data flows: Claude/Cursor talks MCP (stdio) to the Python server, which reads fr
    just install
    ```
 
-   This builds the Go binary, copies it to `/usr/local/bin/whatsapp-cli`, installs the MCP server to `/usr/local/lib/whatsapp-mcp-server/`, sets up the core daemon and sync cron, and adds shell completions.
+   This builds the Go binary, copies it to `/usr/local/bin/whatsapp-cli`, installs the MCP server to `/usr/local/lib/whatsapp-mcp-server/`, sets up the core daemon, and adds shell completions.
 
 3. **Log in** (first time only)
 
@@ -71,35 +71,7 @@ Data flows: Claude/Cursor talks MCP (stdio) to the Python server, which reads fr
 
 5. **Restart Claude Desktop / Cursor**
 
-## Syncing Messages to Text Files
-
-The CLI can export your message history to human-readable `.txt` files, one per chat. This is useful for indexing by chatbots or for offline backups.
-
-The WhatsApp connection does not need to be running. If the message database is empty (e.g. core has never run), sync will automatically connect to WhatsApp and pull available history before archiving. Data is stored in `~/.local/share/whatsapp-cli/`.
-
-### Initial sync
-
-Export all messages from a start date to today:
-
-```bash
-whatsapp-cli sync --from=2024.01.01
-```
-
-### Catch up
-
-Once you have an initial sync, catch up to the current time from wherever you last left off:
-
-```bash
-whatsapp-cli sync --catchup
-```
-
-### Scheduled sync
-
-Install the sync cron job (catches up every 5 minutes):
-
-```bash
-whatsapp-cli install-cron
-```
+## Managing the Daemon
 
 Install the core daemon (runs on login, auto-restarts) and manage it:
 
@@ -110,29 +82,18 @@ whatsapp-cli stop
 whatsapp-cli restart
 ```
 
-### Other options
+Other commands:
 
 ```bash
-# Explicit date range
-whatsapp-cli sync --from=2026.03.01 --to=2026.03.28
-
-# Date range with specific times
-whatsapp-cli sync --from=2026.03.01:09.00 --to=2026.03.01:17.00
-
-# Delete synced messages in a range
-whatsapp-cli sync --delete --from=2026.03.01 --to=2026.03.15
-
 # Show status and data locations
 whatsapp-cli info
 
-# Uninstall daemons and wipe all data
+# Uninstall daemon and wipe all data
 whatsapp-cli reset
 
 # Full uninstall (reset + remove binaries)
 whatsapp-cli uninstall
 ```
-
-Output files are written to `~/.local/share/whatsapp-cli/chats/` by default (override with `--output`). See the full [CLI spec](docs/whatsapp-cli-spec.md) for details on the output format, sync phases, and name resolution.
 
 ## Troubleshooting
 
