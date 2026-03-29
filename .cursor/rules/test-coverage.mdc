@@ -1,0 +1,34 @@
+---
+description: All changes must be tested with 100% coverage on affected code
+globs: whatsapp-cli/**/*.go
+alwaysApply: false
+---
+
+# Test Coverage Requirement
+
+Every change to Go source files must include tests that cover 100% of the new or modified lines.
+
+## Workflow
+
+1. Write or modify the production code.
+2. Write or update tests in the corresponding `*_test.go` file.
+3. Run coverage and verify the changed functions are fully covered:
+   ```bash
+   cd whatsapp-cli
+   go test -tags "sqlite_fts5" -coverprofile=coverage.out -count=1 ./...
+   go tool cover -func=coverage.out | grep <function_name>
+   ```
+4. If any new/modified function is below 100%, add tests for the uncovered branches.
+
+## Conventions
+
+- Build tag `sqlite_fts5` is required for all test and build commands.
+- Database tests: use in-memory SQLite (`file::memory:?cache=shared`), seed via `newTestStore(t)`.
+- HTTP tests: use `net/http/httptest.NewServer` with handler stubs.
+- Table-driven tests for functions with multiple input/output cases.
+- Test both success and error paths for every function.
+- Name tests `TestFunctionName_scenario` with `t.Run` sub-tests.
+
+## Acceptable exceptions
+
+Lines that are impossible to cover without a live WhatsApp connection (e.g. `runMcp` opening a real DB, `runLogin` scanning a QR code) are exempt. Document the exemption in a comment if the function is otherwise partially covered.

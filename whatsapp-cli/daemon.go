@@ -184,8 +184,6 @@ func runLogin(args []string) {
 	}
 	client.Disconnect()
 
-	pumpSearchEmbeddings()
-
 	// Restart daemon if --relogin stopped it
 	if relogin {
 		plist := plistPath()
@@ -193,28 +191,6 @@ func runLogin(args []string) {
 			fmt.Println("Restarting core daemon...")
 			exec.Command("launchctl", "load", plist).Run()
 		}
-	}
-}
-
-// pumpSearchEmbeddings pre-computes vector embeddings for the MCP server's
-// hybrid search so the first query doesn't pay the cold-start cost.
-func pumpSearchEmbeddings() {
-	mcpDir := "/usr/local/lib/whatsapp-mcp-server"
-	if _, err := os.Stat(mcpDir); err != nil {
-		fmt.Println("Skipping search index (MCP server not installed)")
-		return
-	}
-	uvPath, err := exec.LookPath("uv")
-	if err != nil {
-		fmt.Println("Skipping search index (uv not found)")
-		return
-	}
-	fmt.Println("Building search index...")
-	cmd := exec.Command(uvPath, "--directory", mcpDir, "run", "python", "search.py")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Warning: search index build failed: %v\n", err)
 	}
 }
 
@@ -342,20 +318,10 @@ func runUninstall() {
 	}
 	_ = compLine
 
-	for _, path := range []string{
-		"/usr/local/bin/whatsapp-cli",
-		"/usr/local/bin/whatsapp-mcp-server",
-	} {
-		if err := exec.Command("sudo", "rm", "-f", path).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not remove %s (try running with sudo)\n", path)
-		} else {
-			fmt.Printf("Removed %s\n", path)
-		}
-	}
-	if err := exec.Command("sudo", "rm", "-rf", "/usr/local/lib/whatsapp-mcp-server").Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not remove /usr/local/lib/whatsapp-mcp-server (try running with sudo)\n")
+	if err := exec.Command("sudo", "rm", "-f", "/usr/local/bin/whatsapp-cli").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not remove /usr/local/bin/whatsapp-cli (try running with sudo)\n")
 	} else {
-		fmt.Println("Removed /usr/local/lib/whatsapp-mcp-server")
+		fmt.Println("Removed /usr/local/bin/whatsapp-cli")
 	}
 }
 
@@ -436,6 +402,7 @@ func runInfo() {
 var commands = []string{
 	"core",
 	"login",
+	"mcp",
 	"install-daemon",
 	"uninstall",
 	"start",
@@ -485,6 +452,7 @@ func printZshCompletions() {
     cmds=(
         'core:Start the WhatsApp connection and REST API'
         'login:Log in to WhatsApp (scan QR code)'
+        'mcp:Start the MCP server (stdio transport)'
         'install-daemon:Install core daemon (macOS LaunchAgent)'
         'uninstall:Remove daemon, data, and binaries'
         'start:Start the core daemon'

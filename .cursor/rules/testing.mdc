@@ -1,0 +1,39 @@
+---
+description: Testing standards for whatsapp-cli Go codebase
+globs: whatsapp-cli/**/*.go
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Coverage
+- Track coverage with `go test -cover -tags sqlite_fts5 ./...`
+- All new code must have tests; target 100% line coverage on new packages.
+- Use `go tool cover -html=coverage.out` to find uncovered lines.
+- Build tag `sqlite_fts5` is required for all test commands.
+
+## Test Structure
+- Table-driven tests for functions with multiple input/output cases.
+- Each `foo.go` has a corresponding `foo_test.go` in the same package.
+- Helpers shared across tests go in `testutil_test.go`.
+
+## Mocking & Isolation
+- Database: use in-memory SQLite (`file::memory:?cache=shared`) seeded with known fixtures.
+- HTTP (REST API): use `net/http/httptest.NewServer` with handler stubs.
+- WhatsApp client: do **not** call real WhatsApp APIs in tests; wrap access behind interfaces and provide test doubles.
+- File system: use `t.TempDir()` for any file I/O.
+
+## E2E MCP Tests
+- Instantiate `server.MCPServer`, call `server.ServeStdio`-style helpers or invoke tool handlers directly.
+- Assert on JSON tool results, not internal types.
+- Cover every registered MCP tool with at least one success and one error case.
+
+## Naming
+- Test functions: `TestFunctionName_scenario` (e.g. `TestListChats_fuzzyMatch`).
+- Sub-tests via `t.Run("description", ...)`.
+
+## Running
+```bash
+./tasks.sh test        # run all tests with coverage summary
+./tasks.sh test-cover  # open HTML coverage report
+```

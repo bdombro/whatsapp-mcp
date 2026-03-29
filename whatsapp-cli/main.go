@@ -685,6 +685,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  login [--relogin]   Log in to WhatsApp (scan QR code)")
 	fmt.Fprintln(os.Stderr, "  core                Start the WhatsApp connection and REST API")
+	fmt.Fprintln(os.Stderr, "  mcp                 Start the MCP server (stdio transport)")
 	fmt.Fprintln(os.Stderr, "  info                Show install status and data locations")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Daemon:")
@@ -711,6 +712,9 @@ func main() {
 	switch cmd {
 	case "login":
 		runLogin(args)
+		return
+	case "mcp":
+		runMcp()
 		return
 	case "install-daemon":
 		runInstallDaemon()

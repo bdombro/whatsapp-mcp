@@ -1,17 +1,17 @@
-# WhatsApp CLI - Product Spec
+# WhatsApp CLI — Product Spec
 
-The WhatsApp CLI is a Go application that connects to WhatsApp's web multidevice API via the [whatsmeow](https://github.com/tulir/whatsmeow) library. It authenticates as a linked device, receives messages in real time, syncs history, stores everything in a local SQLite database, and exposes a REST API for sending messages and downloading media.
+The WhatsApp CLI is a single Go binary that connects to WhatsApp's web multidevice API via [whatsmeow](https://github.com/tulir/whatsmeow), stores messages locally in SQLite, exposes a REST API for sending/downloading, and provides a built-in [MCP](https://modelcontextprotocol.io/) server for AI assistants. No Python runtime is required.
 
 ## Building
 
 ```
 cd whatsapp-cli
-go build -o whatsapp-cli .
+go build -tags "sqlite_fts5" -o whatsapp-cli .
 ```
 
 CGO must be enabled (default on macOS/Linux) since `go-sqlite3` requires it. On Windows, install a C compiler via [MSYS2](https://www.msys2.org/) and run `go env -w CGO_ENABLED=1` first.
 
-## Usage
+## Commands
 
 ### Login
 
@@ -22,9 +22,9 @@ whatsapp-cli login --relogin
 
 Authenticates with WhatsApp by displaying a QR code. Scan it with your phone (Settings > Linked Devices). If already logged in, shows account info. Required before running `core` or `install-daemon`.
 
-During first login, the CLI captures WhatsApp's initial history sync and stores it in `messages.db`. This is the only time WhatsApp pushes the full chat history. After history sync completes, the CLI pre-computes vector embeddings for the MCP server's hybrid search index so the first query doesn't pay the cold-start cost (~60 seconds for ~5K messages). This step is best-effort and skipped if `uv` or the MCP server is not installed.
+During first login, the CLI captures WhatsApp's initial history sync and stores it in `messages.db`. This is the only time WhatsApp pushes the full chat history.
 
-The `--relogin` flag clears the existing session and message databases, re-displays the QR code for a fresh pairing, captures the initial history sync, rebuilds the search index, and restarts the core daemon if it was previously running. Use this when the session is stale or when the initial history sync was missed.
+The `--relogin` flag clears the existing session and message databases, re-displays the QR code for a fresh pairing, captures the initial history sync, and restarts the core daemon if it was previously running. Use this when the session is stale or when the initial history sync was missed.
 
 ### Core — WhatsApp Connection
 
@@ -32,7 +32,31 @@ The `--relogin` flag clears the existing session and message databases, re-displ
 whatsapp-cli core
 ```
 
-Connects to WhatsApp, listens for messages, syncs history, and starts the REST API server. Requires login. Re-authentication may be required after ~20 days.
+Connects to WhatsApp, listens for messages, syncs history, and starts the REST API server on port 8080. Requires login. Re-authentication may be required after ~20 days.
+
+### MCP — Model Context Protocol Server
+
+```
+whatsapp-cli mcp
+```
+
+Starts the built-in MCP server over stdio transport. This is what Claude Desktop and Cursor invoke to interact with WhatsApp. It reads directly from the local SQLite databases for queries and proxies write operations (send, download) through the core daemon's REST API at `localhost:8080`. The core daemon must be running for write operations.
+
+Configure in your AI client:
+
+```json
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "whatsapp-cli",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For **Claude Desktop**: save to `~/Library/Application Support/Claude/claude_desktop_config.json`
+For **Cursor**: save to `~/.cursor/mcp.json`
 
 ### Daemon Management
 
@@ -45,7 +69,7 @@ whatsapp-cli restart
 
 | Command | Description |
 |---------|-------------|
-| `install-daemon` | Installs and starts the core daemon as a macOS LaunchAgent (`com.whatsapp-cli.core`). Runs on login and auto-restarts on crash. Requires login. Logs to `~/.local/share/whatsapp-cli/core.log`. |
+| `install-daemon` | Installs and starts the core daemon as a macOS LaunchAgent (`com.whatsapp-cli.core`). Runs on login and auto-restarts on crash. Logs to `~/.local/share/whatsapp-cli/core.log`. |
 | `start` | Starts the core daemon. |
 | `stop` | Stops the core daemon. |
 | `restart` | Restarts the core daemon (stop + start). |
@@ -71,13 +95,11 @@ whatsapp-cli completions bash
 whatsapp-cli completions zsh
 ```
 
-Add to your shell profile (e.g. `~/.bashrc` or `~/.zshrc`):
+Add to your shell profile:
 
 ```bash
 eval "$(whatsapp-cli completions zsh)"
 ```
-
-The core daemon runs as `com.whatsapp-cli.core` via launchd. Logs go to `~/.local/share/whatsapp-cli/core.log`.
 
 ---
 
@@ -137,9 +159,11 @@ WhatsApp's servers and the multidevice protocol have several known limitations t
 
 **Downloading media** — reconstructs download parameters from stored metadata, downloads via whatsmeow, and saves to `~/.local/share/whatsapp-cli/{chat_jid}/`. Returns the absolute file path. Files are cached so repeated downloads are a no-op.
 
+---
+
 ## REST API
 
-The CLI starts an HTTP server on port **8080** with two endpoints:
+The core daemon starts an HTTP server on port **8080** with two endpoints:
 
 ### POST /api/send
 
@@ -168,6 +192,68 @@ Download media from a previously received message.
 
 ---
 
+## MCP Tools
+
+The MCP server uses [mcp-go](https://github.com/mark3labs/mcp-go) as the framework. Communication is over stdio (JSON-RPC 2.0).
+
+**Read path**: Queries `messages.db` and `whatsapp.db` directly via SQLite. The core daemon does not need to be running for read-only operations.
+
+**Write path**: Sending messages and downloading media go through the core daemon's REST API at `http://localhost:8080/api`. The core daemon must be running.
+
+### Contact & Chat Discovery
+
+| Tool | Description |
+|------|-------------|
+| `search_contacts` | Search contacts by name or phone number. Queries both the local `chats` table and `whatsmeow_contacts` in `whatsapp.db` for broader coverage. Excludes group JIDs. |
+| `list_chats` | List chats with optional fuzzy search by chat name or participant name. When a query is provided, uses case-insensitive substring matching plus word-level similarity (threshold 0.6) on chat names, and also searches `whatsmeow_contacts` for matching participant names to find groups where that person is a member. |
+| `get_chat` | Get a single chat by JID with optional last message. |
+| `get_direct_chat_by_contact` | Find the direct (non-group) chat for a given phone number. |
+| `get_contact_chats` | List all chats (including groups) where a contact appears as sender. |
+
+### Message Reading
+
+| Tool | Description |
+|------|-------------|
+| `list_messages` | Search and filter messages by time range, sender, chat JID, or text content. When a query is provided, uses BM25 keyword search (FTS5) for relevance-ranked results. Supports pagination and optional surrounding context per message. |
+| `get_message_context` | Get messages before and after a specific message ID within the same chat. |
+| `get_last_interaction` | Get the most recent message involving a contact, returned as a formatted string. |
+
+### Sending
+
+| Tool | Description |
+|------|-------------|
+| `send_message` | Send a text message to a phone number or group JID. Routes through the core daemon's `/api/send` endpoint. |
+| `send_file` | Send a local file (image, video, document) as a media message. The file must be accessible on the machine running the server. |
+| `send_audio_message` | Send an audio file as a playable WhatsApp voice message. Non-ogg files require ffmpeg for conversion. |
+
+### Media
+
+| Tool | Description |
+|------|-------------|
+| `download_media` | Download media from a received message by `message_id` and `chat_jid`. Routes through the core daemon's `/api/download` endpoint. Returns the local file path. |
+
+---
+
+## Search
+
+### BM25 Keyword Search (FTS5)
+
+When `list_messages` is called with a `query` parameter, the server uses SQLite's FTS5 full-text search engine with BM25 scoring. The `messages_fts` virtual table is maintained via triggers so the index is always in sync. FTS5 provides tokenized keyword matching, implicit AND of terms, and TF-IDF-based relevance ranking.
+
+Without a `query` parameter, `list_messages` falls back to chronological listing with optional filters.
+
+### Fuzzy Chat & Participant Search
+
+The `list_chats` tool supports fuzzy search across two dimensions when a query is provided:
+
+1. **Chat name matching** — all chat names are compared against the query using case-insensitive substring matching followed by word-level fuzzy matching (LCS-based similarity ratio with a 0.6 threshold). This handles typos like "famly" matching "Family" and partial words like "birth" matching "Birthday Group".
+
+2. **Participant name matching** — the `whatsmeow_contacts` table in `whatsapp.db` is searched for contacts whose `full_name` or `push_name` fuzzy-matches the query. Matching contact JIDs are then looked up in the `group_participants` table to find groups they belong to, plus their direct chat JIDs. Searching for "Kevin" returns Kevin's direct chat and any group where Kevin is a member, even if the group name doesn't contain "Kevin".
+
+For queries shorter than 3 characters, only exact substring matching is used (fuzzy word matching is disabled to avoid false positives). Multi-word queries require each word to fuzzy-match at least one word in the target text.
+
+---
+
 ## Name Resolution
 
 Contact names are resolved through a multi-step lookup, falling through until a non-phone-number name is found:
@@ -178,7 +264,9 @@ Contact names are resolved through a multi-step lookup, falling through until a 
 4. **whatsapp.db LID mapping** — for LID-based senders, maps LID to phone via `whatsmeow_lid_map`, then re-looks up in `whatsmeow_contacts`
 5. **Fallback** — raw sender string (phone number or JID)
 
-At each step, results that look like phone numbers (all digits, optional leading `+`) or group placeholder names (`Group 120363...`) are skipped in favour of a more authoritative source. If the stored name is a placeholder and a real name is resolved, the `chats` table is automatically updated. For LID-based senders where no contact name exists, the resolved phone number is returned instead of the opaque LID. See [WhatsApp API Limitations](#whatsapp-api-limitations) for cases where resolution cannot succeed.
+At each step, results that look like phone numbers (all digits, optional leading `+`) or group placeholder names (`Group 120363...`) are skipped in favour of a more authoritative source. If the stored name is a placeholder and a real name is resolved, the `chats` table is automatically updated. For LID-based senders where no contact name exists, the resolved phone number is returned instead of the opaque LID.
+
+---
 
 ## Data Storage
 
@@ -188,7 +276,6 @@ All data is stored in `~/.local/share/whatsapp-cli/`.
 |------|---------|
 | `whatsapp.db` | whatsmeow session store (device credentials, contacts, LID mappings) |
 | `messages.db` | Application message and chat database (includes FTS5 index) |
-| `search.db` | Vector embedding cache for semantic search (managed by MCP server) |
 | `{chat_jid}/` | Downloaded media files, organized by chat |
 | `core.log` | Core daemon log |
 
@@ -205,12 +292,23 @@ Both databases are opened by `NewMessageStore()`. The contacts DB is optional an
 
 Tables are created on startup if they don't exist. The FTS5 index is automatically rebuilt from the messages table on first run. The Go binary must be built with `-tags "sqlite_fts5"` to enable FTS5 support.
 
-### Full-Text Search (FTS5)
+---
 
-The `messages_fts` table is an external-content FTS5 virtual table backed by the `messages` table. It enables BM25-ranked keyword search over message content. Three triggers (`messages_fts_insert`, `messages_fts_delete`, `messages_fts_update`) keep the index in sync as messages are added or modified. On startup, if the index is empty but messages exist, a full rebuild is performed automatically.
+## Configuration
+
+No environment variables. Paths and API URL are hardcoded:
+
+| Setting | Value |
+|---------|-------|
+| Data directory | `~/.local/share/whatsapp-cli/` |
+| Messages database | `~/.local/share/whatsapp-cli/messages.db` |
+| Contacts database | `~/.local/share/whatsapp-cli/whatsapp.db` |
+| Core daemon REST API | `http://localhost:8080/api` |
 
 ## Dependencies
 
 - [whatsmeow](https://github.com/tulir/whatsmeow) — WhatsApp web multidevice API
 - [go-sqlite3](https://github.com/mattn/go-sqlite3) — SQLite driver (requires CGO, built with `sqlite_fts5` tag)
+- [mcp-go](https://github.com/mark3labs/mcp-go) — Model Context Protocol server framework
 - [qrterminal](https://github.com/mdp/qrterminal) — QR code rendering in terminal
+- **ffmpeg** (optional) — required only for automatic audio format conversion in `send_audio_message`

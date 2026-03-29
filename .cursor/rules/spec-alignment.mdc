@@ -1,0 +1,26 @@
+---
+description: Keep docs/spec.md aligned with code changes
+globs: whatsapp-cli/**/*.go
+alwaysApply: false
+---
+
+# Spec Alignment
+
+After making functional changes to Go source files, update `docs/spec.md` to reflect the change. The spec is the single source of truth for the CLI's behavior.
+
+## What triggers an update
+
+- Adding, removing, or renaming an MCP tool → update the **MCP Tools** tables
+- Changing a REST API endpoint, request/response shape → update the **REST API** section
+- Adding a new CLI command or flag → update the **Commands** section
+- Changing database schema or adding a table → update **Database Schema**
+- Changing search behavior → update the **Search** section
+- Changing name resolution logic → update **Name Resolution**
+- Adding or removing a Go dependency → update **Dependencies**
+
+## How to update
+
+1. Read the relevant section of `docs/spec.md`.
+2. Edit only the affected section — don't rewrite unrelated parts.
+3. Keep the same markdown structure (headings, tables, code blocks).
+4. After editing, verify the spec compiles cleanly: `grep -c '|' docs/spec.md` should not decrease (tables intact).
