@@ -48,16 +48,19 @@ jobs:
         run: |
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
           echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-21 main' | sudo tee /etc/apt/sources.list.d/llvm.list
-          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
           sudo apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
           sudo apt-get -o Acquire::Retries=3 install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool
           cmake --version
           mkdir -p "$RUNNER_TEMP/tools"
-          ln -s /usr/bin/clang++-21 "$RUNNER_TEMP/tools/clang++"
           ln -s /usr/bin/clang-tidy-21 "$RUNNER_TEMP/tools/clang-tidy"
           echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
-          echo 'CXXFLAGS=-stdlib=libc++' >> "$GITHUB_ENV"
-          echo 'LDFLAGS=-fuse-ld=lld-21' >> "$GITHUB_ENV"
+          {
+            echo 'CC=/usr/bin/clang-21'
+            echo 'CXX=/usr/bin/clang++-21'
+            echo 'CXXFLAGS=-stdlib=libc++'
+            echo 'LDFLAGS=-fuse-ld=lld-21'
+          } >> "$GITHUB_ENV"
       - uses: extractions/setup-just@v3
         with:
           just-version: "1.59.0"
