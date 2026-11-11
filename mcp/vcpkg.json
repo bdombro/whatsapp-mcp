@@ -1,0 +1,9 @@
+{
+  "name": "whatsapp-mcp",
+  "version": "2.0.0",
+  "dependencies": [
+    "slimr-mcp",
+    "slimr-sqlite",
+    "slimr-test"
+  ]
+}

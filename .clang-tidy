@@ -1,0 +1,4 @@
+Checks: '-*,clang-analyzer-core.*,clang-analyzer-cplusplus.NewDelete,bugprone-dangling-handle,bugprone-sizeof-expression'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '[/\\]mcp[/\\](src|tests)[/\\]'
+SystemHeaders: false

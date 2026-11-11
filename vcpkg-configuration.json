@@ -1,0 +1,14 @@
+{
+  "default-registry": {
+    "kind": "builtin",
+    "baseline": "5cad485d1ddb649c8fa1022bf0b3908555e6e6ba"
+  },
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/bdombro/slimr-cpp.git",
+      "baseline": "03ae9f4bbb05beedd08cb9cc4775c0f0a8c3344f",
+      "packages": ["slimr-*"]
+    }
+  ]
+}

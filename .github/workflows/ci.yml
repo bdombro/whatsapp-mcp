@@ -1,0 +1,86 @@
+name: C++ and Go checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/.ci/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.ci/vcpkg-cache
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+      BUGSINK_DSN: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate dependency revision
+        env:
+          VCPKG_REF: ${{ vars.VCPKG_REF }}
+        run: |
+          [[ "$VCPKG_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Set VCPKG_REF to the tested vcpkg commit"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ vars.VCPKG_REF }}
+          path: .ci/vcpkg
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26.13.0"
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: client/go.mod
+          cache-dependency-path: client/go.sum
+      - name: Linux toolchain
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-21 main' | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool python3-venv
+          python3 -m venv "$RUNNER_TEMP/cmake"
+          "$RUNNER_TEMP/cmake/bin/pip" install cmake==4.4.5
+          echo "$RUNNER_TEMP/cmake/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/tools"
+          ln -s /usr/bin/clang++-21 "$RUNNER_TEMP/tools/clang++"
+          ln -s /usr/bin/clang-tidy-21 "$RUNNER_TEMP/tools/clang-tidy"
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+          echo 'CXXFLAGS=-stdlib=libc++' >> "$GITHUB_ENV"
+          echo 'LDFLAGS=-fuse-ld=lld-21' >> "$GITHUB_ENV"
+      - uses: extractions/setup-just@v3
+        with:
+          just-version: "1.59.0"
+      - name: macOS toolchain
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja llvm@21 pkgconf autoconf automake libtool
+          echo "CXX=$(brew --prefix llvm@21)/bin/clang++" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/tools"
+          ln -s "$(brew --prefix llvm@21)/bin/clang-tidy" "$RUNNER_TEMP/tools/clang-tidy"
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+      - name: Prepare vcpkg
+        run: |
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          echo "$VCPKG_ROOT" >> "$GITHUB_PATH"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+      - uses: actions/cache@v4
+        with:
+          path: .ci/vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ vars.VCPKG_REF }}-${{ hashFiles('mcp/vcpkg.json', '.ci/slimr-cpp/packages/**') }}
+          restore-keys: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ vars.VCPKG_REF }}-
+      - run: just test
+      - run: just build
+      - run: just lint
+      - run: just test-mcp
