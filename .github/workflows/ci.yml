@@ -50,10 +50,8 @@ jobs:
           echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-21 main' | sudo tee /etc/apt/sources.list.d/llvm.list
           printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
           sudo apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
-          sudo apt-get -o Acquire::Retries=3 install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool python3-venv
-          python3 -m venv "$RUNNER_TEMP/cmake"
-          "$RUNNER_TEMP/cmake/bin/pip" install cmake==4.4.5
-          echo "$RUNNER_TEMP/cmake/bin" >> "$GITHUB_PATH"
+          sudo apt-get -o Acquire::Retries=3 install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool
+          cmake --version
           mkdir -p "$RUNNER_TEMP/tools"
           ln -s /usr/bin/clang++-21 "$RUNNER_TEMP/tools/clang++"
           ln -s /usr/bin/clang-tidy-21 "$RUNNER_TEMP/tools/clang-tidy"
