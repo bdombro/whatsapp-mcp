@@ -3,3 +3,4 @@
 /mcp/bin/
 /mcp/dist/
 /.ci/
+/Formula/.staging/

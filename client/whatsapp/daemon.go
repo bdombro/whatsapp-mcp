@@ -16,7 +16,6 @@ import (
 
 	"whatsapp-client/core"
 
-	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
 	//lint:ignore SA1019 whatsmeow/binary/proto is deprecated; keep aliases until migrated to waE2E
 	waProto "go.mau.fi/whatsmeow/binary/proto"
@@ -102,61 +101,48 @@ func (w *Source) StartCore(ctx context.Context) error {
 		}
 	})
 
-	connected := make(chan bool, 1)
-
-	if client.Store.ID == nil {
-		qrChan, _ := client.GetQRChannel(context.Background())
-		err = client.Connect()
-		if err != nil {
-			return fmt.Errorf("failed to connect: %w", err)
-		}
-
-		for evt := range qrChan {
-			if evt.Event == "code" {
-				fmt.Println("\nScan this QR code with your WhatsApp app:")
-				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-			} else if evt.Event == "success" {
-				connected <- true
-				break
-			}
-		}
-
-		select {
-		case <-connected:
-			fmt.Println("\nSuccessfully connected and authenticated!")
-		case <-time.After(3 * time.Minute):
-			return fmt.Errorf("timeout waiting for QR code scan")
-		}
-	} else {
-		err = client.Connect()
-		if err != nil {
-			return fmt.Errorf("failed to connect: %w", err)
-		}
-		connected <- true
-	}
-
-	time.Sleep(2 * time.Second)
-
-	if !client.IsConnected() {
-		return fmt.Errorf("failed to establish stable connection")
-	}
-
-	fmt.Println("\n✓ Connected to WhatsApp!")
-
 	watchCtx, stopWatch := context.WithCancel(ctx)
 	defer stopWatch()
-	go func() {
-		defer core.RecoverReport()
-		watchDisconnected(watchCtx, client.IsConnected, DisconnectReportAfter, time.Minute, reportLongDisconnect)
-	}()
+	var watchOnce sync.Once
+	startDisconnectWatch := func() {
+		watchOnce.Do(func() {
+			go func() {
+				defer core.RecoverReport()
+				watchDisconnected(watchCtx, client.IsConnected, DisconnectReportAfter, time.Minute, reportLongDisconnect)
+			}()
+		})
+	}
 
-	restServer, err := startRESTServer(client, messageStore, dir)
+	pairMgr := NewPairManager(ctx, &whatsmeowPairBackend{client: client}, startDisconnectWatch)
+	restServer, err := startRESTServer(client, messageStore, dir, pairMgr)
 	if err != nil {
 		return err
 	}
 	defer restServer.Close()
 
 	fmt.Println("REST server is running.")
+
+	if client.Store.ID != nil {
+		if err = client.Connect(); err != nil {
+			return fmt.Errorf("failed to connect: %w", err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for !client.IsConnected() && time.Now().Before(deadline) {
+			select {
+			case <-ctx.Done():
+				client.Disconnect()
+				return nil
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		if !client.IsConnected() {
+			return fmt.Errorf("failed to establish stable connection")
+		}
+		fmt.Println("\n✓ Connected to WhatsApp!")
+		startDisconnectWatch()
+	} else {
+		logger.Infof("No WhatsApp session paired yet; waiting for pairing via daemon.sock or 'whatsapp-client login'")
+	}
 
 	select {
 	case <-ctx.Done():
@@ -450,11 +436,15 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 	fmt.Printf("History sync complete. Stored %d messages.\n", syncedCount)
 }
 
-// startRESTServer launches the daemon-side write API on the 0600 Unix socket in dataDir, exposing send/download endpoints that
-// proxy to the live WhatsApp client. The caller closes the returned server when the client stops so a reconnect can listen again.
-func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, dataDir string) (*http.Server, error) {
+// startRESTServer launches the daemon-side API on the 0600 Unix socket in dataDir, exposing send/download and pairing endpoints.
+// The caller closes the returned server when the client stops so a reconnect can listen again.
+func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, dataDir string, pairMgr *PairManager) (*http.Server, error) {
 	startTime := time.Now()
 	mux := http.NewServeMux()
+
+	if pairMgr != nil {
+		registerPairRoutes(mux, pairMgr)
+	}
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]interface{}{

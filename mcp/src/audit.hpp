@@ -7,15 +7,22 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
 
 namespace whatsapp {
 
+inline std::mutex& audit_mutex() {
+    static std::mutex mu;
+    return mu;
+}
+
 inline void log_audit(const std::string& dataDir, const std::string& tool, const slimr::Json& args) {
     if (dataDir.empty()) return;
     try {
+        std::lock_guard<std::mutex> lock(audit_mutex());
         std::filesystem::path dir(dataDir);
         std::filesystem::create_directories(dir);
         std::filesystem::path logFile = dir / "mcp-audit.log";

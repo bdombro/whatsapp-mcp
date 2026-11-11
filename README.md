@@ -23,7 +23,7 @@ The split keeps message access tightly scoped: the sync client owns the WhatsApp
 
 ## `.mcp.json` Configuration
 
-In the `assistant2` workspace, `whatsapp-mcp/mcp` is mounted into the unified `build/bin/assistant-mcp` gateway under the `whatsapp_` prefix (`whatsapp_list_chats`, `whatsapp_get_chat`, `whatsapp_list_messages`, `whatsapp_export`, `whatsapp_sql`, `whatsapp_send_message`, …).
+`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (`http://127.0.0.1:8088/mcp`, with OAuth 2.1 + PKCE and a browser QR/approval UI), stdio (`whatsapp-mcp mcp`, protocol `2026-07-28`), or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
 
 To run `whatsapp-mcp` as a standalone MCP server in `.mcp.json`:
 
@@ -73,8 +73,10 @@ plugins/whatsapp-mcp/
     │   ├── allowlist.hpp     # Safe file path containment for `send_file` and `send_audio_message`
     │   ├── audit.hpp         # Append-only `mcp-audit.log` writer, `config.json` loader & sliding-window rate limiter
     │   ├── daemon_client.hpp # Unix domain socket client (`CURLOPT_UNIX_SOCKET_PATH`) to `daemon.sock`
-    │   ├── app.hpp           # `whatsapp::make_whatsapp_app()` registering all 15 tools & Bugsink DSN
-    │   └── main.cpp          # Standalone CLI & stdio MCP entrypoint
+    │   ├── app.hpp           # `whatsapp::make_whatsapp_app()` registering all 16 tools & Bugsink DSN
+    │   ├── oauth_as.hpp      # OAuth 2.1 + PKCE AS & browser QR/approval flow
+    │   ├── qr_svg.hpp        # Standalone QR encoder for browser pairing SVG
+    │   └── main.cpp          # Standalone CLI, stdio MCP (`mcp`), and HTTP/OAuth (`http`) entrypoint
     └── tests/
         └── test_main.cpp     # ASan + UBSan tests for `wa_utc`, key isolation, FTS5, views, export & allowlist
 ```
@@ -127,6 +129,75 @@ Override with `WHATSAPP_CLIENT_DATA_DIR` (falls back to `WHATSAPP_MCP_DATA_DIR` 
 cd assistant2/plugins/whatsapp-mcp && just cutover
 client/dist/whatsapp-client status
    ```
+
+## macOS Build Prerequisites (vcpkg setup)
+
+Install [Homebrew](https://brew.sh) and current Xcode Command Line Tools
+(`xcode-select --install`; finish installation before continuing), or full Xcode.
+Apple Clang 21 is the verified C++26/libc++ toolchain; older installations need
+upgrading. These instructions assume Apple Silicon Homebrew at `/opt/homebrew`.
+
+Add this environment snippet to `~/.zshrc`, then open a new terminal (or run
+`source ~/.zshrc`). Use `~/.zshrc`, not `~/.zshenv`, to avoid changing
+non-interactive zsh scripts:
+
+`local-ports` is the dedicated vcpkg overlay directory for local development
+linking: `just publish --local --all` registers symlinks to your slimr-cpp checkout,
+overriding published packages without making a registry release. See the
+[publishing guide on slimr-cpp](https://github.com/bdombro/slimr-cpp/blob/main/docs/publishing.md#local-environment).
+
+```bash
+export VCPKG_ROOT="$HOME/.local/share/vcpkg"
+export VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"
+# Use your existing workspace checkout instead when available.
+export SLIMR_CPP="${SLIMR_CPP:-$HOME/dev/bdombro/slimr-cpp}"
+export CXX="/usr/bin/clang++"
+export CLANG_TIDY="/opt/homebrew/opt/llvm/bin/clang-tidy"
+export PATH="$VCPKG_ROOT:/opt/homebrew/opt/ruby/bin:/opt/homebrew/bin:$PATH"
+```
+
+Then install and build from the repository root:
+
+```bash
+brew install cmake ninja just llvm node ruby autoconf automake libtool pkgconf go
+mkdir -p "$(dirname "$VCPKG_ROOT")"
+if [ ! -d "$VCPKG_ROOT/.git" ]; then
+  git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+fi
+"$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+mkdir -p "$(dirname "$SLIMR_CPP")"
+if [ ! -d "$SLIMR_CPP/.git" ]; then
+  git clone https://github.com/bdombro/slimr-cpp.git "$SLIMR_CPP"
+fi
+(cd "$SLIMR_CPP" && just publish --local --all)
+ln -s "$SLIMR_CPP/ports/libhv" "$VCPKG_OVERLAY_PORTS/libhv"
+
+"$CXX" --version
+vcpkg version
+go version
+BUGSINK_DSN="" just test
+just build
+```
+
+The libhv link is a one-time step: if it exists, verify that it points to the
+chosen checkout's `ports/libhv` before skipping the command. Never overwrite
+a conflicting port directory or modify installed headers/caches. Current HTTP
+builds need both local slimr overlays and the separately pinned libhv port;
+the older published registry baseline alone is not an HTTP build substitute.
+`mcp/` installs vcpkg dependencies into `mcp/build/deps/`, including static
+SQLite/FTS5, curl and OpenSSL; no separate Homebrew library installs are needed.
+Go must satisfy [`client/go.mod`](./client/go.mod); its dependencies are
+resolved automatically by `go test`/`go build`, without vcpkg.
+
+Bootstrapping puts the executable at `$VCPKG_ROOT/vcpkg`, with no `bin/`
+subdirectory. Keg-only Homebrew Ruby supplies `/opt/homebrew/opt/ruby/bin/ruby`.
+Homebrew LLVM supplies lint tooling; select a different compatible `CXX`
+before first configure if needed, since CMake caches it. For reproducible
+vcpkg tooling, check out the tested full `VCPKG_REF` commit before bootstrapping;
+package registry baselines pin resolution separately.
+These commands do not start or pair the client, install LaunchAgents, or
+modify production session/history data. Never start a second sync daemon
+against an already-used session.
 
 ## Building & Testing Both Components
 

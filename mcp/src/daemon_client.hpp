@@ -61,6 +61,116 @@ struct DownloadedMedia {
     std::string filename;
 };
 
+struct PairStatus {
+    bool available = false;
+    bool paired = false;
+    bool connected = false;
+    std::string jid;
+    std::string error;
+};
+
+struct PairQrState {
+    bool available = false;
+    std::string status; // "available" | "waiting" | "timeout" | "already_paired" | "cancelled"
+    bool paired = false;
+    std::string qr;
+    int expiresInS = 0;
+    std::string error;
+};
+
+inline PairStatus daemon_pair_status(const std::string& sockPath) {
+    PairStatus st;
+    if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
+        st.error = "WhatsApp sync daemon is not running (daemon.sock not found)";
+        return st;
+    }
+    try {
+        slimr::HttpRequest req;
+        req.method = "GET";
+        req.url = "http://localhost/api/pair/status";
+        req.unixSocketPath = sockPath;
+        auto resp = slimr::request(req);
+        if (resp.status != 200) {
+            st.error = "daemon status request failed with HTTP " + std::to_string(resp.status);
+            return st;
+        }
+        auto jRes = slimr::parse_json(resp.body);
+        if (!jRes || !jRes->is_object()) {
+            st.error = "invalid daemon status JSON";
+            return st;
+        }
+        const auto& j = *jRes;
+        st.available = true;
+        st.paired = j.contains("paired") && j["paired"].is_boolean() ? j["paired"].get<bool>() : false;
+        st.connected = j.contains("connected") && j["connected"].is_boolean() ? j["connected"].get<bool>() : false;
+        if (j.contains("jid") && j["jid"].is_string()) {
+            st.jid = j["jid"].get<std::string>();
+        }
+        return st;
+    } catch (const std::exception& e) {
+        st.error = e.what();
+        return st;
+    }
+}
+
+inline PairQrState daemon_pair_qr(const std::string& sockPath) {
+    PairQrState qr;
+    if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
+        qr.error = "WhatsApp sync daemon is not running (daemon.sock not found)";
+        return qr;
+    }
+    try {
+        slimr::HttpRequest req;
+        req.method = "GET";
+        req.url = "http://localhost/api/pair/qr";
+        req.unixSocketPath = sockPath;
+        auto resp = slimr::request(req);
+        if (resp.status != 200) {
+            qr.error = "daemon QR request failed with HTTP " + std::to_string(resp.status);
+            return qr;
+        }
+        auto jRes = slimr::parse_json(resp.body);
+        if (!jRes || !jRes->is_object()) {
+            qr.error = "invalid daemon QR JSON";
+            return qr;
+        }
+        const auto& j = *jRes;
+        qr.available = true;
+        qr.paired = j.contains("paired") && j["paired"].is_boolean() ? j["paired"].get<bool>() : false;
+        if (j.contains("status") && j["status"].is_string()) {
+            qr.status = j["status"].get<std::string>();
+        }
+        if (j.contains("qr") && j["qr"].is_string()) {
+            qr.qr = j["qr"].get<std::string>();
+        }
+        if (j.contains("expires_in_s") && j["expires_in_s"].is_int64()) {
+            qr.expiresInS = static_cast<int>(j["expires_in_s"].get<int64_t>());
+        }
+        return qr;
+    } catch (const std::exception& e) {
+        qr.error = e.what();
+        return qr;
+    }
+}
+
+inline bool daemon_pair_cancel(const std::string& sockPath) {
+    if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
+        return false;
+    }
+    try {
+        slimr::HttpRequest req;
+        req.method = "POST";
+        req.url = "http://localhost/api/pair/cancel";
+        req.unixSocketPath = sockPath;
+        req.headers["Content-Type"] = "application/json";
+        req.body = "{}";
+        auto resp = slimr::request(req);
+        return resp.status == 200;
+    } catch (...) {
+        return false;
+    }
+}
+
 inline SendResult daemon_send(const std::string& sockPath, const std::string& recipient, const std::string& message, const std::string& mediaPath = "") {
     slimr::HttpRequest req;
     req.method = "POST";

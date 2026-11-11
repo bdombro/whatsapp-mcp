@@ -13,7 +13,9 @@
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -22,6 +24,17 @@
 #include <vector>
 
 namespace whatsapp {
+
+inline std::mutex& db_mutex_for(const std::string& path) {
+    static std::mutex registryMu;
+    static std::map<std::string, std::unique_ptr<std::mutex>> registry;
+    std::lock_guard<std::mutex> lk(registryMu);
+    auto& ptr = registry[path];
+    if (!ptr) {
+        ptr = std::make_unique<std::mutex>();
+    }
+    return *ptr;
+}
 
 inline std::string base64_url_encode(std::string_view input) {
     static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -391,6 +404,7 @@ public:
 
     slimr::IterateResult querySql(const std::string& query, size_t limit = 200) const {
         std::string validated = validate_read_only_sql(query);
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.limit = (limit > 5000) ? 5000 : (limit == 0 ? 200 : limit);
@@ -452,6 +466,7 @@ public:
         }
         sql += " ORDER BY chat_jid, ts_utc, id";
 
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.limit = static_cast<size_t>(limit + 1);
@@ -526,6 +541,7 @@ public:
         params.push_back(static_cast<int64_t>(limit));
         params.push_back(static_cast<int64_t>(offset));
 
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -557,6 +573,7 @@ public:
 
     std::vector<ContactRow> searchContacts(const std::string& query) const {
         std::string pattern = "%" + query + "%";
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -587,12 +604,12 @@ SELECT DISTINCT jid, name, phone FROM (
         return contacts;
     }
 
-    ChatRow getChat(const std::string& chatJid, bool includeLast = true) const {
-        auto chats = listChats(std::nullopt, 1, 0, includeLast, "last_active");
+    ChatRow getChat(const std::string& chatJid, bool /*includeLast*/ = true) const {
         std::string sql = "SELECT c.jid, c.name, (c.jid LIKE '%@g.us') AS is_group, c.last_message_time, "
                           "m.content, m.sender, m.is_from_me FROM chats c "
                           "LEFT JOIN messages m ON c.jid = m.chat_jid AND c.last_message_time = m.timestamp "
                           "WHERE c.jid = ?";
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -626,6 +643,7 @@ SELECT DISTINCT jid, name, phone FROM (
                           "m.content, m.sender, m.is_from_me FROM chats c "
                           "LEFT JOIN messages m ON c.jid = m.chat_jid AND c.last_message_time = m.timestamp "
                           "WHERE c.jid LIKE ? AND c.jid NOT LIKE '%@g.us' LIMIT 1";
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -664,6 +682,7 @@ SELECT DISTINCT jid, name, phone FROM (
                           "JOIN messages m ON c.jid = m.chat_jid "
                           "WHERE m.sender = ? OR c.jid = ? "
                           "ORDER BY c.last_message_time DESC LIMIT ? OFFSET ?";
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -704,6 +723,7 @@ SELECT DISTINCT jid, name, phone FROM (
         if (limit <= 0) limit = 200;
         if (page < 0) page = 0;
 
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -899,6 +919,7 @@ SELECT DISTINCT jid, name, phone FROM (
     }
 
     slimr::Json getMessageContext(const std::string& messageId, int before = 5, int after = 5) const {
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -988,6 +1009,7 @@ SELECT DISTINCT jid, name, phone FROM (
     }
 
     std::string getLastInteraction(const std::string& jid) const {
+        std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
         opts.readOnlyConnection = (msgPath_ != ":memory:");

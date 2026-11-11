@@ -83,7 +83,10 @@ func runDaemon() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	daemonLoop(ctx, dir, whatsapp.IsLoggedIn, func(ctx context.Context) error {
+	if !whatsapp.IsLoggedIn(dir) {
+		slog.Info("no WhatsApp session yet; daemon.sock will accept browser pairing or run 'whatsapp-client login'", "data_dir", dir)
+	}
+	daemonLoop(ctx, dir, func(string) bool { return true }, func(ctx context.Context) error {
 		src := whatsapp.NewSource(dir)
 		defer src.Close()
 		return src.StartCore(ctx)

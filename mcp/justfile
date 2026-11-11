@@ -30,13 +30,10 @@ build: (configure "Release")
     ctest --test-dir build/cmake/Release --output-on-failure --no-tests=error
 
 lint: (configure "Debug")
-    clang-tidy -p build/cmake/Debug src/main.cpp tests/test_main.cpp
+    CLANG_TIDY="${CLANG_TIDY:-clang-tidy}" && "$CLANG_TIDY" -p build/cmake/Debug src/main.cpp tests/test_main.cpp
 
 test-mcp: build
     node scripts/test-mcp.mjs build/bin/whatsapp-mcp list_chats,list_messages,search_contacts,get_chat,get_direct_chat_by_contact,get_contact_chats,get_message_context,get_last_interaction,send_message,send_file,send_audio_message,download_media,export,sql,schema,status
-
-inspect:
-    npx --yes @modelcontextprotocol/inspector@2.14.0 ./build/bin/whatsapp-mcp mcp
 
 run *args:
     ./build/bin/whatsapp-mcp "$@"

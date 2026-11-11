@@ -32,9 +32,6 @@ lint:
 test-mcp:
     just --justfile mcp/justfile test-mcp
 
-inspect:
-    just --justfile mcp/justfile inspect
-
 run *args:
     ./mcp/build/bin/whatsapp-mcp "$@"
 
@@ -47,18 +44,45 @@ clean:
 status:
     @echo "=== Daemon Status ==="
     @if [ -x client/dist/whatsapp-client ]; then \
-        client/dist/whatsapp-client status || true; \
+        client/dist/whatsapp-client status; \
     elif command -v whatsapp-client >/dev/null 2>&1; then \
-        whatsapp-client status || true; \
-    elif command -v whatsapp-mcp >/dev/null 2>&1; then \
-        whatsapp-mcp status || true; \
+        whatsapp-client status; \
     else \
-        echo "Neither whatsapp-client nor whatsapp-mcp installed in PATH"; \
+        echo "whatsapp-client not found in client/dist or PATH"; \
     fi
     @echo "=== MCP Status ==="
-    @if [ -f mcp/build/bin/whatsapp-mcp ]; then \
+    @if [ -x mcp/build/bin/whatsapp-mcp ]; then \
         mcp/build/bin/whatsapp-mcp status '{"json":true}'; \
+    elif command -v whatsapp-mcp >/dev/null 2>&1; then \
+        whatsapp-mcp status '{"json":true}'; \
+    else \
+        echo "whatsapp-mcp not built or installed in PATH"; \
     fi
+
+# Install release Homebrew formula (pass "whatsapp-mcp whatsapp-client" to include client)
+install *formulas:
+    node scripts/dev-formula.mjs install {{formulas}}
+
+# Stage local binary tarball into bdombro/whatsapp-mcp tap and install (default: whatsapp-mcp)
+install-local *formulas:
+    node scripts/dev-formula.mjs install-local {{formulas}}
+
+# Stop whatsapp-mcp if running, reinstall from local build, and restart if previously running
+reinstall-local *formulas:
+    node scripts/dev-formula.mjs reinstall-local {{formulas}}
+
+# Start/stop/restart only the whatsapp-mcp HTTP service (never spawns duplicate whatsapp-client)
+start:
+    HOMEBREW_NO_AUTO_UPDATE=1 brew services start bdombro/whatsapp-mcp/whatsapp-mcp
+
+stop:
+    HOMEBREW_NO_AUTO_UPDATE=1 brew services stop bdombro/whatsapp-mcp/whatsapp-mcp
+
+restart:
+    HOMEBREW_NO_AUTO_UPDATE=1 brew services restart bdombro/whatsapp-mcp/whatsapp-mcp
+
+uninstall:
+    HOMEBREW_NO_AUTO_UPDATE=1 brew uninstall bdombro/whatsapp-mcp/whatsapp-mcp
 
 # Perform safe single-daemon cutover from com.bdombro.whatsapp-mcp to com.bdombro.whatsapp-client
 cutover: build

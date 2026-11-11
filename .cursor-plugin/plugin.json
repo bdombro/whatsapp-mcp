@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-mcp",
+  "displayName": "WhatsApp MCP",
+  "description": "Local-first WhatsApp history, search, media, and messaging MCP server over Streamable HTTP with OAuth 2.1 + PKCE and browser QR pairing.",
+  "version": "2.0.0",
+  "author": {
+    "name": "Brian Dombrowski",
+    "url": "https://github.com/bdombro"
+  },
+  "homepage": "https://github.com/bdombro/whatsapp-mcp",
+  "repository": "https://github.com/bdombro/whatsapp-mcp",
+  "license": "MIT",
+  "mcpServers": {
+    "whatsapp": {
+      "type": "http",
+      "url": "http://127.0.0.1:8088/mcp"
+    }
+  }
+}

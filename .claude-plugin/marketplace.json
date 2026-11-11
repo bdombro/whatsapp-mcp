@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-mcp",
+  "owner": {
+    "name": "Brian Dombrowski",
+    "url": "https://github.com/bdombro"
+  },
+  "metadata": {
+    "description": "Local-first WhatsApp MCP plugin backed by whatsapp-client and OAuth 2.1 HTTP transport.",
+    "version": "2.0.0"
+  },
+  "plugins": [
+    {
+      "name": "whatsapp-mcp",
+      "source": "./",
+      "description": "WhatsApp history, search, media, and messaging MCP server (http://127.0.0.1:8088/mcp).",
+      "version": "2.0.0"
+    }
+  ]
+}

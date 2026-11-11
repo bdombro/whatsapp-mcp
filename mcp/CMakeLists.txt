@@ -17,6 +17,7 @@ option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 
 find_package(slimr-mcp CONFIG REQUIRED)
 find_package(slimr-sqlite CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 add_library(app_options INTERFACE)
 target_compile_options(app_options INTERFACE -ftrivial-auto-var-init=zero)
@@ -46,7 +47,7 @@ endif()
 
 add_executable(whatsapp-mcp src/main.cpp)
 target_include_directories(whatsapp-mcp PRIVATE src)
-target_link_libraries(whatsapp-mcp PRIVATE slimr::mcp slimr::sqlite app_options)
+target_link_libraries(whatsapp-mcp PRIVATE slimr::mcp_http slimr::sqlite OpenSSL::Crypto app_options)
 set_target_properties(whatsapp-mcp PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/build/bin")
@@ -56,7 +57,7 @@ if(BUILD_TESTING)
     add_executable(whatsapp_test tests/test_main.cpp)
     target_include_directories(whatsapp_test PRIVATE src)
     target_link_libraries(whatsapp_test PRIVATE
-        slimr::mcp slimr::sqlite slimr::test app_options)
+        slimr::mcp_http slimr::sqlite OpenSSL::Crypto slimr::test app_options)
     set_target_properties(whatsapp_test PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
     add_test(NAME whatsapp COMMAND whatsapp_test)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-tmp" "${CMAKE_BINARY_DIR}/test-home")

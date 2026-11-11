@@ -2,7 +2,9 @@
 
 Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server and CLI.
 
-`whatsapp-mcp/mcp` is a stateless C++26 application built on `slimr-cpp` providing all 15 `whatsapp_*` MCP tools and CLI commands against `~/.local/share/whatsapp-client/messages.db` and `daemon.sock`.
+`whatsapp-mcp/mcp` is a standalone C++26 application built on `slimr-cpp` (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) and CLI commands against `~/.local/share/whatsapp-client/messages.db` and `daemon.sock`.
+
+Over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 8088`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
 
 ## Commands
 
@@ -21,7 +23,7 @@ Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server
    - Register deterministic scalar function `wa_utc`.
    - `ATTACH DATABASE '.../whatsapp.db' AS wa_TempDb` read-only.
    - Copy only contact names (`t_names`), contacts (`t_contacts`), and LID mappings (`t_lid_map`) into `TEMP` tables.
-   - Immediately `DETACH DATABASE wa_TempDb` so `whatsmeow` Signal private keys and session ratchets cannot be read by any subsequent SQL query (including `whatsapp_sql`).
+   - Immediately `DETACH DATABASE wa_TempDb` so `whatsmeow` Signal private keys and session ratchets cannot be read by any subsequent SQL query (including `sql`).
    - Create `TEMP` views `v_messages`, `v_chats`, `v_contacts` and enforce `PRAGMA query_only = ON`.
 2. **File Send Containment (`src/allowlist.hpp`):** `send_file` and `send_audio_message` must only accept regular files under `$HOME` or `/tmp`/`$TMPDIR`, rejecting symlinks, hidden paths (`~/.ssh`, `~/.config`), and `~/Library`.
 3. **Audit & Rate Limiting (`src/audit.hpp`):** Every tool call must append a record to `mcp-audit.log`, and mutating tools must enforce `mutating_tools_per_min` and `read_only` / `disabled_tools` from `config.json`.

@@ -2,8 +2,12 @@
   "name": "whatsapp-mcp",
   "version": "2.0.0",
   "dependencies": [
-    "slimr-mcp",
+    {
+      "name": "slimr-mcp",
+      "features": ["http"]
+    },
     "slimr-sqlite",
-    "slimr-test"
+    "slimr-test",
+    "openssl"
   ]
 }
