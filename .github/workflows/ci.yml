@@ -48,8 +48,8 @@ jobs:
         run: |
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
           echo 'deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-21 main' | sudo tee /etc/apt/sources.list.d/llvm.list
-          sudo apt-get update
-          sudo apt-get install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool python3-venv
+          sudo apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
+          sudo apt-get -o Acquire::Retries=3 install -y clang-21 clang-tidy-21 libc++-21-dev libc++abi-21-dev lld-21 ninja-build zsh pkg-config autoconf automake libtool python3-venv
           python3 -m venv "$RUNNER_TEMP/cmake"
           "$RUNNER_TEMP/cmake/bin/pip" install cmake==4.4.5
           echo "$RUNNER_TEMP/cmake/bin" >> "$GITHUB_PATH"

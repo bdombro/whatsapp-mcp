@@ -7,7 +7,7 @@
     {
       "kind": "git",
       "repository": "https://github.com/bdombro/slimr-cpp.git",
-      "baseline": "03ae9f4bbb05beedd08cb9cc4775c0f0a8c3344f",
+      "baseline": "91b48cf91739dc622f97c6dd8f0c0f54c367ce43",
       "packages": ["slimr-*"]
     }
   ]
