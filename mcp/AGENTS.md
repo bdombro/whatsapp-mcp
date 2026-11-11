@@ -6,6 +6,14 @@ Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server
 
 Over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 8088`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
 
+
+## Documentation Upkeep
+
+When a change conflicts with `README.md`, update the affected README and its
+linked user/developer documentation in the same change. Keep examples,
+configuration, install/build commands and compatibility claims consistent
+with implemented behavior; do not claim unverified release or client support.
+
 ## Commands
 
 | Task | Command |
@@ -32,7 +40,7 @@ Over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 8088`), it enfo
 
 CMake declares targets/dependencies; Ninja owns incremental builds. Just orchestrates automatic `deps` before configure/build/test/lint; CMake manifest auto-install is disabled. Set `VCPKG_ROOT` and `VCPKG_OVERLAY_PORTS` in the environment. Dependencies install under `build/deps/`; Debug sanitizer and Release trees live under `build/cmake/`. Use installed slimr targets, never source-checkout include overrides. SQLite is statically linked with FTS5. `run` does not rebuild.
 
-Use a Clang/C++26 toolchain with libc++ FAST hardening, CMake, Ninja, vcpkg, just, and compatible clang-tidy. Inspector uses pinned npm tooling and an isolated server environment; it does not call tools, open user databases, or connect to/start the daemon.
+Use a Clang/C++26 toolchain with libc++ FAST hardening, CMake, Ninja, vcpkg, just, and compatible clang-tidy. `test-mcp` checks July discovery over stdio and ephemeral HTTP with Node and an isolated server environment; it does not call tools, open user databases, or connect to/start the daemon.
 
 ## C++ Memory Safety
 

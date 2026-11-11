@@ -2,6 +2,14 @@
 
 Written for: AI coding agents working in the `whatsapp-mcp` plugin repository (`client/` Go sync daemon + `mcp/` C++26 MCP & CLI).
 
+
+## Documentation Upkeep
+
+When a change conflicts with `README.md`, update the affected README and its
+linked user/developer documentation in the same change. Keep examples,
+configuration, install/build commands and compatibility claims consistent
+with implemented behavior; do not claim unverified release or client support.
+
 ## Commands
 
 | Task | Command |
@@ -30,7 +38,7 @@ Written for: AI coding agents working in the `whatsapp-mcp` plugin repository (`
 
 ## Build Architecture
 
-The root justfile delegates Go commands unchanged to `client/` and CMake/Ninja commands to `mcp/`. The root `.clang-tidy` covers `mcp/src` and `mcp/tests`. Native Linux/macOS CI runs Go tests/build plus C++ Debug/Release tests, lint, and isolated Inspector discovery. Keep macOS LaunchAgent deployment separate from portable tests; never start the daemon during validation.
+The root justfile delegates Go commands unchanged to `client/` and CMake/Ninja commands to `mcp/`. The root `.clang-tidy` covers `mcp/src` and `mcp/tests`. Native macOS CI is configured for Go tests/build plus C++ Debug/Release tests, lint, and isolated July MCP discovery; Linux support is unverified. Keep macOS LaunchAgent deployment separate from portable tests; never start the daemon during validation.
 
 ## C++ Memory Safety
 
