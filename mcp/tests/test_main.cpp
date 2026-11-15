@@ -710,7 +710,7 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
         httpOpts,
         OAuthAsConfig{
             .daemonSocketPath = sockPath.string(),
-            .defaultBaseUrl = "http://127.0.0.1:8088",
+            .defaultBaseUrl = "http://127.0.0.1:10008",
         },
         /*isFixedPort=*/false);
 
@@ -1166,7 +1166,7 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
     {
         slimr::HttpServerOptions badHost;
         badHost.host = "0.0.0.0";
-        badHost.port = 8088;
+        badHost.port = 10008;
         slimr::McpHttpServer s(app, badHost);
         std::string err;
         CHECK(!s.start(&err));

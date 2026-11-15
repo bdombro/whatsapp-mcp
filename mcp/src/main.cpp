@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
     auto app = whatsapp::make_whatsapp_app();
 
     std::string host = "127.0.0.1";
-    int port = 8088;
+    int port = 10008;
     for (int i = 2; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--host" && i + 1 < argc) {
@@ -27,13 +27,13 @@ int main(int argc, char** argv) {
 
     slimr::HttpServerOptions httpOpts;
     httpOpts.host = "127.0.0.1";
-    httpOpts.port = 8088;
+    httpOpts.port = 10008;
     httpOpts.allowEphemeralPort = false;
     httpOpts.allowNonLoopback = false;
 
     const std::string dataDir = whatsapp::resolve_data_dir();
     const std::string sockPath = whatsapp::resolve_socket_path(dataDir);
-    const std::string baseUrl = "http://" + host + ":" + std::to_string(port > 0 ? port : 8088);
+    const std::string baseUrl = "http://" + host + ":" + std::to_string(port > 0 ? port : 10008);
 
     auto oauthAs = whatsapp::configure_whatsapp_http_oauth(
         httpOpts,

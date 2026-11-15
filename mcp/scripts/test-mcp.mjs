@@ -251,7 +251,7 @@ async function testHttpOAuthSmoke(tmpDir) {
 }
 
 async function testNonLoopbackRefused(tmpDir) {
-  const proc = spawn(binPath, ["http", "--host", "0.0.0.0", "--port", "8088"], {
+  const proc = spawn(binPath, ["http", "--host", "0.0.0.0", "--port", "10008"], {
     env: makeIsolatedEnv(tmpDir),
     stdio: ["ignore", "pipe", "pipe"],
   });

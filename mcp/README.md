@@ -48,7 +48,7 @@ After starting the service, add this server to OpenCode v2.2.6's
     "servers": {
       "whatsapp-mcp": {
         "type": "remote",
-        "url": "http://127.0.0.1:8088/mcp",
+        "url": "http://127.0.0.1:10008/mcp",
         "protocol": "2026-07-28"
       }
     }
@@ -64,7 +64,7 @@ applies to every transport.
 
 ## Tools & CLI Commands
 
-Every tool is exposed over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 8088`), stdio MCP (`whatsapp-mcp mcp`, protocol `2026-07-28`), and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`). The companion Go `whatsapp-client` identity and data paths are unchanged.
+Every tool is exposed over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 10008`), stdio MCP (`whatsapp-mcp mcp`, protocol `2026-07-28`), and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`). The companion Go `whatsapp-client` identity and data paths are unchanged.
 
 | Tool | Scope | Kind | Description |
 | --- | --- | --- | --- |

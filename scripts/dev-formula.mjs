@@ -15,7 +15,7 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
 const TAP_NAME = "bdombro/whatsapp-mcp";
 const TAP_SHORT_DIR = "homebrew-whatsapp-mcp";
 const STAGING_DIR = path.join(REPO_ROOT, "Formula", ".staging");
-const ENDPOINT_URL = "http://127.0.0.1:8088/.well-known/oauth-authorization-server";
+const ENDPOINT_URL = "http://127.0.0.1:10008/.well-known/oauth-authorization-server";
 
 const FORMULAS = {
   "whatsapp-client": {
@@ -259,7 +259,7 @@ switch (action) {
     if (isReinstall && wasRunning.get("whatsapp-mcp")) {
       run("brew", ["services", "start", `${TAP_NAME}/whatsapp-mcp`], { env: brewEnv() });
       await waitForMcpEndpoint();
-      console.log("whatsapp-mcp restarted and ready at http://127.0.0.1:8088/mcp");
+      console.log("whatsapp-mcp restarted and ready at http://127.0.0.1:10008/mcp");
     }
     break;
   }

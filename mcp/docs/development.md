@@ -19,7 +19,7 @@ The stateless MCP server and JSON CLI are implemented in C++26 on `slimr-cpp`. I
 
 ## HTTP Transport, OAuth 2.1 & Browser Connect UX
 
-When launched via `whatsapp-mcp http --host 127.0.0.1 --port 8088` (default port `8088`), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
+When launched via `whatsapp-mcp http --host 127.0.0.1 --port 10008` (default port `10008`), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
 - `GET /.well-known/oauth-protected-resource` (RFC 9728) & `GET /.well-known/oauth-authorization-server` (RFC 8414)
 - `POST /register` (RFC 7591 dynamic client registration restricted to loopback redirect URIs)
 - `GET /authorize` + `GET /authorize/qr` + `POST /authorize/approve` + `POST /authorize/cancel` (CSRF-protected browser Connect page; renders live QR SVG when `whatsapp-client` is unpaired, or shows the already-paired JID for explicit owner approval without touching `whatsapp.db`)

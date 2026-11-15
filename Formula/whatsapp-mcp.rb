@@ -12,7 +12,7 @@ class WhatsappMcp < Formula
   end
 
   service do
-    run [opt_bin/"whatsapp-mcp", "http", "--host", "127.0.0.1", "--port", "8088"]
+    run [opt_bin/"whatsapp-mcp", "http", "--host", "127.0.0.1", "--port", "10008"]
     keep_alive true
     log_path var/"log/whatsapp-mcp.log"
     error_log_path var/"log/whatsapp-mcp.err.log"
@@ -20,7 +20,7 @@ class WhatsappMcp < Formula
 
   def caveats
     <<~EOS
-      whatsapp-mcp listens on http://127.0.0.1:8088/mcp with OAuth 2.1 + PKCE.
+      whatsapp-mcp listens on http://127.0.0.1:10008/mcp with OAuth 2.1 + PKCE.
       Start the service with:
         brew services start bdombro/whatsapp-mcp/whatsapp-mcp
 

@@ -25,9 +25,9 @@ with implemented behavior; do not claim unverified release or client support.
 | Folder | Language | Owns | Must Not |
 | --- | --- | --- | --- |
 | [`client/`](./client/AGENTS.md) | Go 1.26 (`whatsmeow`) | 24/7 WhatsApp Web sync into `messages.db`, QR pairing (`login`), LaunchAgent lifecycle (`com.bdombro.whatsapp-client`), 2FA OTP scrubbing, and `daemon.sock` (`/api/send`, `/api/download`) | Serve MCP or expose a TCP port |
-| [`mcp/`](./mcp/AGENTS.md) | C++26 (`slimr-cpp`) | All 16 MCP/CLI tools (`list_chats`, …, `sql`, `schema`, `status`), Streamable HTTP (`127.0.0.1:8088`) + OAuth 2.1 + PKCE + browser QR pairing/approval UI, cryptographic session-key isolation (`DETACH whatsapp.db`), `v_messages`/`v_chats`/`v_contacts` views, `wa_utc`, rate limiting, `mcp-audit.log`, and `daemon.sock` client | Write to `whatsapp.db` or `messages.db` |
-| [`Formula/`](./Formula/) | Ruby (Homebrew) | Sibling formulas `whatsapp-client.rb` (Go sync daemon) and `whatsapp-mcp.rb` (C++26 HTTP MCP service on port `8088`) — kept independent so restarting `whatsapp-mcp` never spawns a duplicate sync daemon | Run two daemons against one `whatsapp.db` |
-| [`.cursor-plugin/`](./.cursor-plugin/), [`.claude-plugin/`](./.claude-plugin/) | JSON manifests | Plugin metadata pointing to `http://127.0.0.1:8088/mcp` | Embed stdio wrappers or credentials |
+| [`mcp/`](./mcp/AGENTS.md) | C++26 (`slimr-cpp`) | All 16 MCP/CLI tools (`list_chats`, …, `sql`, `schema`, `status`), Streamable HTTP (`127.0.0.1:10008`) + OAuth 2.1 + PKCE + browser QR pairing/approval UI, cryptographic session-key isolation (`DETACH whatsapp.db`), `v_messages`/`v_chats`/`v_contacts` views, `wa_utc`, rate limiting, `mcp-audit.log`, and `daemon.sock` client | Write to `whatsapp.db` or `messages.db` |
+| [`Formula/`](./Formula/) | Ruby (Homebrew) | Sibling formulas `whatsapp-client.rb` (Go sync daemon) and `whatsapp-mcp.rb` (C++26 HTTP MCP service on port `10008`) — kept independent so restarting `whatsapp-mcp` never spawns a duplicate sync daemon | Run two daemons against one `whatsapp.db` |
+| [`.cursor-plugin/`](./.cursor-plugin/), [`.claude-plugin/`](./.claude-plugin/) | JSON manifests | Plugin metadata pointing to `http://127.0.0.1:10008/mcp` | Embed stdio wrappers or credentials |
 
 ## Critical Safety Rules
 

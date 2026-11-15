@@ -91,7 +91,7 @@ brew services restart bdombro/whatsapp-mcp/whatsapp-mcp
 brew services stop bdombro/whatsapp-mcp/whatsapp-mcp
 ```
 
-The endpoint is `http://127.0.0.1:8088/mcp`; logs are under
+The endpoint is `http://127.0.0.1:10008/mcp`; logs are under
 `/opt/homebrew/var/log/`. To run in the foreground instead, use
 `whatsapp-mcp http` (or `./mcp/build/bin/whatsapp-mcp http` from a source checkout).
 Do not run the foreground server and service on the same port.
@@ -109,7 +109,7 @@ After starting the service, add this server to OpenCode v2.2.6's
     "servers": {
       "whatsapp-mcp": {
         "type": "remote",
-        "url": "http://127.0.0.1:8088/mcp",
+        "url": "http://127.0.0.1:10008/mcp",
         "protocol": "2026-07-28"
       }
     }

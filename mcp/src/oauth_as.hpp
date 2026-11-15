@@ -367,7 +367,7 @@ inline void add_security_headers(slimr::HttpRouteResponse& resp, std::string_vie
 
 struct OAuthAsConfig {
     std::string daemonSocketPath;
-    std::string defaultBaseUrl{"http://127.0.0.1:8088"};
+    std::string defaultBaseUrl{"http://127.0.0.1:10008"};
     std::string mcpPath{"/mcp"};
     int authTxTtlSeconds{300};
     int authCodeTtlSeconds{120};

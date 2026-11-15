@@ -66,7 +66,7 @@ plugins/whatsapp-mcp/
 
 ## `.mcp.json` Configuration
 
-`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (`http://127.0.0.1:8088/mcp`, with OAuth 2.1 + PKCE and a browser QR/approval UI), stdio (`whatsapp-mcp mcp`, protocol `2026-07-28`), or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
+`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (`http://127.0.0.1:10008/mcp`, with OAuth 2.1 + PKCE and a browser QR/approval UI), stdio (`whatsapp-mcp mcp`, protocol `2026-07-28`), or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
 
 To run `whatsapp-mcp` as a standalone MCP server in `.mcp.json`:
 
