@@ -42,9 +42,12 @@ func TestCLI_resetRequiresYes(t *testing.T) {
 	}
 }
 
-// Verifies the root command wires every client subcommand.
+// Verifies the root command wires every client subcommand and the --log-file flag.
 func TestRootCmd_subcommands(t *testing.T) {
 	root := newRootCmd()
+	if root.PersistentFlags().Lookup("log-file") == nil {
+		t.Fatal("missing --log-file persistent flag")
+	}
 	for _, name := range []string{"daemon", "start", "stop", "restart", "status", "login", "reset", "completion"} {
 		if c, _, err := root.Find([]string{name}); err != nil || c.Name() != name {
 			t.Errorf("missing subcommand %s", name)
@@ -56,7 +59,8 @@ func TestRootCmd_subcommands(t *testing.T) {
 func TestStatus_textAndJSON(t *testing.T) {
 	dir := seedDataDir(t)
 	snap := buildStatus(dir)
-	if snap.Session != "no" || snap.DataDir != dir || !strings.HasSuffix(snap.Log, logFileName) {
+	expectedLogSuffix := filepath.Join("var", "log", "whatsapp-client.log")
+	if snap.Session != "no" || snap.DataDir != dir || !strings.HasSuffix(snap.Log, expectedLogSuffix) {
 		t.Fatalf("snapshot: %+v", snap)
 	}
 	var out bytes.Buffer

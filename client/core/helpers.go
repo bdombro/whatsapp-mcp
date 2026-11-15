@@ -3,7 +3,10 @@ package core
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -18,7 +21,31 @@ const (
 	McpDataDirEnv    = "WHATSAPP_MCP_DATA_DIR"
 )
 
-// DataDir returns the app data root (~/.local/share/whatsapp-client unless overridden).
+// BrewPrefix returns the Homebrew prefix from HOMEBREW_PREFIX, `brew --prefix`, or OS/arch defaults.
+func BrewPrefix() string {
+	if v := strings.TrimSpace(os.Getenv("HOMEBREW_PREFIX")); v != "" {
+		return v
+	}
+	if out, err := exec.Command("brew", "--prefix").Output(); err == nil {
+		if v := strings.TrimSpace(string(out)); v != "" {
+			return v
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		if runtime.GOARCH == "arm64" {
+			return "/opt/homebrew"
+		}
+		return "/usr/local"
+	}
+	return "/home/linuxbrew/.linuxbrew"
+}
+
+// DefaultLogPath returns the default Homebrew service log path for whatsapp-client.
+func DefaultLogPath() string {
+	return filepath.Join(BrewPrefix(), "var", "log", "whatsapp-client.log")
+}
+
+// DataDir returns the app data root ($(brew --prefix)/var/whatsapp-client unless overridden).
 func DataDir() string {
 	dataDirOnce.Do(func() {
 		if v := os.Getenv(ClientDataDirEnv); v != "" {
@@ -29,11 +56,7 @@ func DataDir() string {
 			dataDirValue = v
 			return
 		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
-		}
-		dataDirValue = filepath.Join(home, ".local", "share", "whatsapp-client")
+		dataDirValue = filepath.Join(BrewPrefix(), "var", "whatsapp-client")
 	})
 	return dataDirValue
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"whatsapp-client/core"
@@ -32,7 +31,7 @@ func buildStatus(dir string) statusSnapshot {
 		Version: BuildVersion,
 		Built:   BuildTime,
 		Daemon:  "not installed",
-		Log:     filepath.Join(dir, logFileName),
+		Log:     core.DefaultLogPath(),
 		DataDir: dir,
 		Session: whatsapp.SessionAuthDisplay(dir),
 	}

@@ -28,19 +28,21 @@ The client itself is not an MCP server.
 
 | Command | Description |
 | --- | --- |
-| `whatsapp-client daemon` | Run the sync daemon in the foreground (invoked by `launchd` via `com.bdombro.whatsapp-client.plist`) |
+| `whatsapp-client daemon [--log-file <path>]` | Run the sync daemon in the foreground; `--log-file` redirects stdout/stderr and rotates at 10 MB keeping one `.1` |
 | `whatsapp-client login [--relogin]` | Pair device by scanning a terminal QR code (`--relogin` wipes existing session first; stop the daemon before running) |
 | `whatsapp-client start` | Bootstrap `~/Library/LaunchAgents/com.bdombro.whatsapp-client.plist` |
 | `whatsapp-client stop` | Bootout the LaunchAgent and wait for `daemon.sock` to close |
 | `whatsapp-client restart` | Restart the LaunchAgent |
-| `whatsapp-client status [--json]` | Report daemon PID/socket status, WhatsApp connection state, and total chat/message counts |
+| `whatsapp-client status [--json]` | Report daemon PID/socket status, log path (`$(brew --prefix)/var/log/whatsapp-client.log`), WhatsApp connection state, and total chat/message counts |
 | `whatsapp-client reset --yes` | Delete `whatsapp.db` and `messages.db` (requires daemon to be stopped) |
 
 ## Environment Variables
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `WHATSAPP_CLIENT_DATA_DIR` | `~/.local/share/whatsapp-client` | Directory for `whatsapp.db`, `messages.db`, `daemon.sock`, and `daemon.log` |
+| `WHATSAPP_CLIENT_DATA_DIR` | `$(brew --prefix)/var/whatsapp-client` | Directory for `whatsapp.db`, `messages.db`, and `daemon.sock` |
+| `WHATSAPP_MCP_DATA_DIR` | Unset | Fallback data directory when `WHATSAPP_CLIENT_DATA_DIR` is unset |
+| `HOMEBREW_PREFIX` | `brew --prefix` | Optional Homebrew prefix override for default data and log paths |
 | `BUGSINK_DSN` | Unset (disabled) | Sentry DSN (`""` disables) |
 
 ## Troubleshooting

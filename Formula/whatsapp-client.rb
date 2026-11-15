@@ -12,16 +12,16 @@ class WhatsappClient < Formula
   end
 
   service do
-    run [opt_bin/"whatsapp-client", "daemon"]
+    run [opt_bin/"whatsapp-client", "daemon", "--log-file", var/"log/whatsapp-client.log"]
     keep_alive true
     log_path var/"log/whatsapp-client.log"
-    error_log_path var/"log/whatsapp-client.err.log"
+    error_log_path var/"log/whatsapp-client.log"
   end
 
   def caveats
     <<~EOS
       whatsapp-client stores Signal credentials, history, and the owner-only Unix socket in:
-        ~/.local/share/whatsapp-client/
+        #{var}/whatsapp-client/
 
       Run only ONE whatsapp-client daemon against a given whatsapp.db.
       If you already manage com.bdombro.whatsapp-client via LaunchAgent, do not also start this Homebrew service.

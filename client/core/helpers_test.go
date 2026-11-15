@@ -6,27 +6,24 @@ import (
 	"testing"
 )
 
-// Verifies DataDir defaults to ~/.local/share/whatsapp-client when no env is set.
+// Verifies DataDir defaults to $(brew --prefix)/var/whatsapp-client when no env is set.
 func TestDataDir_default(t *testing.T) {
-	ResetDataDirForTest()
-	origClient := os.Getenv(ClientDataDirEnv)
-	origMcp := os.Getenv(McpDataDirEnv)
-	os.Unsetenv(ClientDataDirEnv)
-	os.Unsetenv(McpDataDirEnv)
-	defer func() {
-		ResetDataDirForTest()
-		if origClient != "" {
-			os.Setenv(ClientDataDirEnv, origClient)
-		}
-		if origMcp != "" {
-			os.Setenv(McpDataDirEnv, origMcp)
-		}
-	}()
+	t.Cleanup(ResetDataDirForTest)
+	t.Setenv(ClientDataDirEnv, "")
+	t.Setenv(McpDataDirEnv, "")
 
-	dir := DataDir()
-	home, _ := os.UserHomeDir()
-	expected := filepath.Join(home, ".local", "share", "whatsapp-client")
-	if dir != expected {
+	customPrefix := t.TempDir()
+	t.Setenv("HOMEBREW_PREFIX", customPrefix)
+	ResetDataDirForTest()
+	expected := filepath.Join(customPrefix, "var", "whatsapp-client")
+	if dir := DataDir(); dir != expected {
+		t.Fatalf("expected %s, got %s", expected, dir)
+	}
+
+	t.Setenv("HOMEBREW_PREFIX", "")
+	ResetDataDirForTest()
+	expected = filepath.Join(BrewPrefix(), "var", "whatsapp-client")
+	if dir := DataDir(); dir != expected {
 		t.Fatalf("expected %s, got %s", expected, dir)
 	}
 }
@@ -60,6 +57,19 @@ func TestDataDir_mcpFallbackEnv(t *testing.T) {
 
 	dir := DataDir()
 	if dir != custom {
+		t.Fatalf("expected %s, got %s", custom, dir)
+	}
+}
+
+// Verifies WHATSAPP_CLIENT_DATA_DIR wins even when HOMEBREW_PREFIX is set.
+func TestDataDir_clientEnvWinsOverHomebrewPrefix(t *testing.T) {
+	t.Cleanup(ResetDataDirForTest)
+	custom := t.TempDir()
+	t.Setenv("HOMEBREW_PREFIX", t.TempDir())
+	t.Setenv(ClientDataDirEnv, custom)
+	ResetDataDirForTest()
+
+	if dir := DataDir(); dir != custom {
 		t.Fatalf("expected %s, got %s", custom, dir)
 	}
 }

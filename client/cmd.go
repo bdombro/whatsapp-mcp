@@ -14,6 +14,7 @@ import (
 // newRootCmd builds the Cobra command tree for the CLI.
 func newRootCmd() *cobra.Command {
 	dataDir := core.DataDir()
+	var logFile string
 	root := &cobra.Command{
 		Use:   "whatsapp-client",
 		Short: "WhatsApp sync daemon and pairing CLI",
@@ -22,8 +23,9 @@ It provides a local REST API over daemon.sock for sending messages and downloadi
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.PersistentFlags().StringVar(&logFile, "log-file", "", "Redirect stdout and stderr to log file with 10 MB rotation")
 	root.AddCommand(
-		newDaemonCmd(),
+		newDaemonCmd(&logFile),
 		newStartCmd(),
 		newStopCmd(),
 		newRestartCmd(),
@@ -50,13 +52,13 @@ func dispatchCLI(args []string) {
 	}
 }
 
-func newDaemonCmd() *cobra.Command {
+func newDaemonCmd(logFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:     "daemon",
 		Aliases: []string{"core"},
 		Short:   "Run the sync daemon in the foreground (used by the LaunchAgent)",
 		Args:    cobra.NoArgs,
-		Run:     func(*cobra.Command, []string) { runDaemon() },
+		RunE:    func(*cobra.Command, []string) error { return runDaemon(*logFile) },
 	}
 }
 

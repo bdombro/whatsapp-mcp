@@ -18,9 +18,6 @@ import (
 // plistName is the LaunchAgent label for the sync daemon.
 const plistName = "com.bdombro.whatsapp-client"
 
-// logFileName is the daemon log inside the data dir.
-const logFileName = "daemon.log"
-
 // daemonRetryInterval is how long the daemon waits before reconnecting or re-checking for a session.
 var daemonRetryInterval = 30 * time.Second
 
@@ -66,23 +63,22 @@ func runRestart() {
 	runStart()
 }
 
-// trimLogFile keeps the daemon log bounded so a long-lived LaunchAgent does not grow it forever.
-func trimLogFile(dataDir string) {
-	path := filepath.Join(dataDir, logFileName)
-	if err := core.TrimLogFilePath(path, core.LogTrimThresholdBytes, core.LogKeepTailBytes); err != nil {
-		slog.Warn("could not trim log file", "path", path, "err", err)
-		core.ReportErr("daemon:trim_log", err)
-	}
-}
-
 // runDaemon is the LaunchAgent entrypoint: it keeps the WhatsApp client connected while a paired session exists.
-func runDaemon() {
+func runDaemon(logFile string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	if logFile != "" {
+		waitLog, err := core.SetupLogFile(ctx, logFile, core.DefaultLogMaxBytes, core.DefaultLogCheckInterval)
+		if err != nil {
+			stop()
+			return err
+		}
+		defer waitLog()
+	}
+	defer stop()
+
 	dir := core.DataDir()
-	trimLogFile(dir)
 	slog.Info("starting whatsapp-client daemon", "data_dir", dir)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	if !whatsapp.IsLoggedIn(dir) {
 		slog.Info("no WhatsApp session yet; daemon.sock will accept browser pairing or run 'whatsapp-client login'", "data_dir", dir)
 	}
@@ -92,6 +88,7 @@ func runDaemon() {
 		return src.StartCore(ctx)
 	})
 	slog.Info("daemon stopped")
+	return nil
 }
 
 // daemonLoop runs the client while logged in, waiting between attempts, until ctx is cancelled.
