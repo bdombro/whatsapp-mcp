@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix direct CLI tool calls (`<bin> <tool> '{...}'`), disabled by default since `slimr-mcp` v0.1.4
 - Internal: replace slimr-curl/libhv with cpp-httplib (AF_UNIX daemon client) and upgrade slimr-mcp/slimr-bugsink
 - Internal: switch macOS build to llvm@23 with static libc++
 

@@ -400,8 +400,10 @@ TEST_CASE("sqlite database, FTS5 and session-key isolation") {
 
 TEST_CASE("mock unix socket send and download") {
     slimr::testing::TempDirGuard temp("wa_sock_");
-    // Unix socket addresses have a small fixed bound, even in deeply nested checkouts.
-    auto sock_path = std::filesystem::relative(temp.path / "daemon.sock");
+    // Unix socket addresses have a small fixed bound, so use the shorter of the absolute and relative paths.
+    auto sock_path = temp.path / "daemon.sock";
+    if (auto rel = std::filesystem::relative(sock_path); rel.native().size() < sock_path.native().size())
+        sock_path = rel;
     auto dl_dir = temp.path / "downloads";
     std::filesystem::create_directories(dl_dir);
 
@@ -687,6 +689,14 @@ TEST_CASE("version and Bugsink release come from VERSION") {
         R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"status","arguments":{},)" + meta + "}}"));
     const auto status = parse_json_ok(call["result"]["content"][0]["text"].get_string());
     CHECK(status["version"].get_string() == WHATSAPP_APP_VERSION);
+}
+
+TEST_CASE("CLI runs the status tool") {
+    auto app = make_whatsapp_app();
+    char arg0[] = "whatsapp-mcp";
+    char arg1[] = "status";
+    char *argv[] = {arg0, arg1, nullptr};
+    CHECK(app.run(2, argv) == 0);
 }
 
 TEST_CASE("OAuth AS routes accept loopback peers only") {
