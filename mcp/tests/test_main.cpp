@@ -650,6 +650,13 @@ TEST_CASE("data dir resolution") {
         CHECK(resolve_socket_path(resolve_data_dir()) == "/brew/prefix/var/whatsapp-client/daemon.sock");
     }
 
+    SUBCASE("ignores a stray var/whatsapp-mcp dir") {
+        slimr::testing::TempDirGuard temp("wa_brew_");
+        std::filesystem::create_directories(temp.path / "var" / "whatsapp-mcp");
+        ScopedEnvVar tempPrefix("HOMEBREW_PREFIX", temp.path.string());
+        CHECK(resolve_data_dir() == (temp.path / "var" / "whatsapp-client").string());
+    }
+
     SUBCASE("WHATSAPP_MCP_DATA_DIR overrides the default") {
         ScopedEnvVar mcp("WHATSAPP_MCP_DATA_DIR", "/data/mcp");
         CHECK(resolve_data_dir() == "/data/mcp");
