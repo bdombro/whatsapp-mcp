@@ -1,0 +1,11 @@
+# Pending lint follow-ups (enable one check per reviewed commit):
+#   -bugprone-misplaced-widening-cast (28 findings)
+#   -bugprone-unchecked-string-to-number-conversion (7 findings)
+#   -bugprone-suspicious-stringview-data-usage (7 findings)
+#   -bugprone-exception-escape (2 findings)
+#   -bugprone-empty-catch (2 findings)
+#   -bugprone-implicit-widening-of-multiplication-result (1 finding)
+Checks: '-*,clang-analyzer-core.*,clang-analyzer-cplusplus.*,bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-signed-bitwise,-bugprone-throwing-static-initialization,-bugprone-reserved-identifier,-bugprone-branch-clone,-bugprone-macro-parentheses,-bugprone-lambda-function-name,-bugprone-std-exception-baseclass,-bugprone-switch-missing-default-case,-bugprone-argument-comment,-bugprone-unintended-char-ostream-output,-bugprone-misplaced-widening-cast,-bugprone-unchecked-string-to-number-conversion,-bugprone-suspicious-stringview-data-usage,-bugprone-exception-escape,-bugprone-empty-catch,-bugprone-implicit-widening-of-multiplication-result'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '[/\\](src|tests)[/\\]'
+SystemHeaders: false
