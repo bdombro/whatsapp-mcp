@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.31)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version")
 if(CMAKE_HOST_APPLE AND NOT CMAKE_OSX_SYSROOT)
     execute_process(COMMAND xcrun --show-sdk-path
         OUTPUT_VARIABLE CMAKE_OSX_SYSROOT OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY)
 endif()
-project(whatsapp LANGUAGES CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" APP_VERSION LIMIT_COUNT 1)
+string(STRIP "${APP_VERSION}" APP_VERSION)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
+project(whatsapp VERSION "${APP_VERSION}" LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +24,17 @@ find_package(slimr-sqlite CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 add_library(app_options INTERFACE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libc++.so
+        OUTPUT_VARIABLE libcxx_so OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+    cmake_path(GET libcxx_so PARENT_PATH libcxx_dir)
+    cmake_path(NORMAL_PATH libcxx_dir)
+    string(APPEND CMAKE_REQUIRED_FLAGS " -stdlib=libc++")
+    list(APPEND CMAKE_REQUIRED_LINK_OPTIONS -L${libcxx_dir})
+    target_compile_options(app_options INTERFACE -stdlib=libc++)
+    target_link_options(app_options INTERFACE -stdlib=libc++ -L${libcxx_dir}
+        $<$<CONFIG:Release>:-static-libstdc++> $<$<NOT:$<CONFIG:Release>>:-Wl$<COMMA>-rpath$<COMMA>${libcxx_dir}>)
+endif()
 target_compile_options(app_options INTERFACE -ftrivial-auto-var-init=zero)
 check_cxx_source_compiles("
 #include <version>
@@ -31,9 +46,10 @@ check_cxx_source_compiles("
 #endif
 int main() { return 0; }" HAVE_LIBCPP_HARDENING)
 if(NOT HAVE_LIBCPP_HARDENING)
-    message(FATAL_ERROR "Use a Clang/libc++ toolchain supporting FAST hardening")
+    message(FATAL_ERROR "Use a Clang/libc++ toolchain supporting FAST hardening (the check also fails on link errors; see CMakeFiles/CMakeConfigureLog.yaml)")
 endif()
 target_compile_definitions(app_options INTERFACE
+    WHATSAPP_APP_VERSION="${PROJECT_VERSION}"
     _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST)
 if(ENABLE_SANITIZERS)
     target_compile_options(app_options INTERFACE
@@ -62,5 +78,5 @@ if(BUILD_TESTING)
     add_test(NAME whatsapp COMMAND whatsapp_test)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-tmp" "${CMAKE_BINARY_DIR}/test-home")
     set_tests_properties(whatsapp PROPERTIES TIMEOUT 120
-        ENVIRONMENT "BUGSINK_DSN=;TMPDIR=${CMAKE_BINARY_DIR}/test-tmp;HOME=${CMAKE_BINARY_DIR}/test-home;XDG_CONFIG_HOME=${CMAKE_BINARY_DIR}/test-home/config;XDG_DATA_HOME=${CMAKE_BINARY_DIR}/test-home/data;XDG_STATE_HOME=${CMAKE_BINARY_DIR}/test-home/state")
+        ENVIRONMENT "BUGSINK_DSN=;HOMEBREW_PREFIX=${CMAKE_BINARY_DIR}/test-brew;TMPDIR=${CMAKE_BINARY_DIR}/test-tmp;HOME=${CMAKE_BINARY_DIR}/test-home;XDG_CONFIG_HOME=${CMAKE_BINARY_DIR}/test-home/config;XDG_DATA_HOME=${CMAKE_BINARY_DIR}/test-home/data;XDG_STATE_HOME=${CMAKE_BINARY_DIR}/test-home/state")
 endif()

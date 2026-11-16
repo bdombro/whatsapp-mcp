@@ -1,0 +1,74 @@
+name: Setup C++ toolchain and vcpkg
+description: Install Homebrew toolchain packages and bootstrap vcpkg with binary caching
+
+runs:
+  using: composite
+  steps:
+    - name: Install macOS toolchain
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install llvm@23 ninja just bun jq
+
+    - name: Install Linux toolchain
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        /home/linuxbrew/.linuxbrew/bin/brew install llvm@23 ninja just bun jq
+        echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+        echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        {
+          echo "HOMEBREW_PREFIX=$HOMEBREW_PREFIX"
+          echo "HOMEBREW_CELLAR=$HOMEBREW_CELLAR"
+          echo "HOMEBREW_REPOSITORY=$HOMEBREW_REPOSITORY"
+        } >> "$GITHUB_ENV"
+
+    - name: Setup Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: client/go.mod
+        cache-dependency-path: client/go.sum
+
+    - name: Read vcpkg baseline
+      id: vcpkg-ref
+      shell: bash
+      run: |
+        baseline=""
+        if [ -f mcp/vcpkg-configuration.json ]; then
+          baseline="$(jq -r '.["default-registry"].baseline // empty' mcp/vcpkg-configuration.json)"
+          if [ -n "$baseline" ] && ! [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::default-registry.baseline in mcp/vcpkg-configuration.json must be a 40-char commit SHA"
+            exit 1
+          fi
+        fi
+        echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
+
+    - name: Checkout vcpkg
+      if: steps.vcpkg-ref.outputs.baseline != ''
+      shell: bash
+      run: |
+        rm -rf "$RUNNER_TEMP/vcpkg"
+        git init "$RUNNER_TEMP/vcpkg"
+        git -C "$RUNNER_TEMP/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+        git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "${{ steps.vcpkg-ref.outputs.baseline }}"
+        git -C "$RUNNER_TEMP/vcpkg" checkout --detach FETCH_HEAD
+
+    - name: Bootstrap vcpkg
+      if: steps.vcpkg-ref.outputs.baseline != ''
+      shell: bash
+      run: |
+        "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+        mkdir -p "$RUNNER_TEMP/vcpkg-cache"
+        echo "$RUNNER_TEMP/vcpkg" >> "$GITHUB_PATH"
+        {
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg"
+          echo "VCPKG_DEFAULT_BINARY_CACHE=$RUNNER_TEMP/vcpkg-cache"
+        } >> "$GITHUB_ENV"
+
+    - name: Cache vcpkg binaries
+      if: steps.vcpkg-ref.outputs.baseline != ''
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-cache
+        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-${{ hashFiles('mcp/vcpkg*.json') }}
+        restore-keys: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-

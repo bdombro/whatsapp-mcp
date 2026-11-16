@@ -1,0 +1,101 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        type: choice
+        required: true
+        default: patch
+        options: [patch, minor, major]
+concurrency: release
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  plan:
+    needs: test
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      runners: ${{ steps.plan.outputs.runners }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - uses: oven-sh/setup-bun@v2
+      - id: plan
+        run: |
+          version="$(bun scripts/release.ts next "${{ inputs.bump }}")"
+          runners="$(just --evaluate platforms | jq -Rc 'split(" ") | map(select(length > 0) | {macos: "macos-26", linux: "ubuntu-24.04"}[.] // error("unknown platform: \(.)"))')"
+          {
+            echo "version=$version"
+            echo "runners=$runners"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.runners) }}
+    runs-on: ${{ matrix.os }}
+    env:
+      BUGSINK_DSN: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build release
+        run: |
+          printf '%s\n' "${{ needs.plan.outputs.version }}" > VERSION
+          just build
+      - name: Package release assets
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            target="arm64-macos"
+          else
+            target="x64-linux"
+          fi
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            if find mcp/build/bin -type f -perm -u+x -exec otool -L {} + | grep -F "$(brew --prefix)/"; then
+              echo "::error::macOS release binary must not link Homebrew libraries"
+              exit 1
+            fi
+          fi
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            if ldd mcp/build/bin/* | grep -q 'libc++\.so'; then
+              echo "::error::Linux release binary must not dynamically link libc++.so"
+              exit 1
+            fi
+            mcp/build/bin/whatsapp-mcp --version
+          fi
+          mkdir -p dist
+          tar -czf "dist/whatsapp-client-${target}.tar.gz" -C client/dist .
+          tar -czf "dist/whatsapp-mcp-${target}.tar.gz" -C mcp/build/bin .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          path: dist/whatsapp-*
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, build]
+    if: always() && needs.plan.result == 'success' && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Configure git author
+        run: |
+          git config user.name "$(git log -1 --format='%an')"
+          git config user.email "$(git log -1 --format='%ae')"
+      - run: bun scripts/release.ts publish "${{ needs.plan.outputs.version }}" assets

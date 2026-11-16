@@ -1,0 +1,34 @@
+name: test
+on: [workflow_dispatch, workflow_call, pull_request]
+permissions:
+  contents: read
+
+jobs:
+  platforms:
+    runs-on: ubuntu-24.04
+    outputs:
+      runners: ${{ steps.p.outputs.runners }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - id: p
+        run: |
+          runners="$(just --evaluate platforms | jq -Rc 'split(" ") | map(select(length > 0) | {macos: "macos-26", linux: "ubuntu-24.04"}[.] // error("unknown platform: \(.)"))')"
+          echo "runners=$runners" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: platforms
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.platforms.outputs.runners) }}
+    runs-on: ${{ matrix.os }}
+    env:
+      BUGSINK_DSN: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: just test
+      - run: just lint
+      - if: hashFiles('mcp/scripts/test-mcp.ts') != ''
+        run: just test-mcp

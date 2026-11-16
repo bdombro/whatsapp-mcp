@@ -1,42 +1,73 @@
-set shell := ["zsh", "-f", "-eu", "-o", "pipefail", "-c"]
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set positional-arguments
 
-architecture := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64")
-system := if os() == "macos" { "osx" } else { os() }
-triplet := f'{{architecture}}-{{system}}'
-cxx := env("CXX", if os() == "macos" { "/usr/bin/clang++" } else { "clang++" })
+formula := "whatsapp-mcp"
+endpoint := "http://127.0.0.1:10008/mcp"
+tools := "list_chats,list_messages,search_contacts,get_chat,get_direct_chat_by_contact,get_contact_chats,get_message_context,get_last_interaction,send_message,send_file,send_audio_message,download_media,export,sql,schema,status"
+test_target := "whatsapp_test"
+platforms := "macos linux"
+# Root justfile, root .github/ and root release scripts own two-service install, daemons and release
+check_skip := ".github/** scripts/release.ts scripts/formula-shared.ts scripts/test-mcp.ts _probe daemon-* install uninstall release"
+required := "brew bun cmake gh git jq just ninja vcpkg"
+log := `brew --prefix` + "/var/log/" + formula + ".log"
+llvm := env("LLVM_BIN", `brew --prefix llvm@23` + "/bin")
+cxx := env("CXX", if os() == "macos" { "/usr/bin/clang++" } else { llvm + "/clang++" })
+triplet := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64") + if os() == "macos" { "-osx" } else { "-linux" }
+deps_env := if os() == "linux" { "CC=\"" + llvm + "/clang\" CXX=\"" + cxx + "\" LIBCXX_DIR=\"$(dirname \"$(\"" + cxx + "\" -print-file-name=libc++.so)\")\" " } else { "" }
+discover := '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 
 _:
     @just --list
 
-deps:
-    vcpkg install --triplet={{triplet}} --x-install-root=build/deps --x-wait-for-lock
+# Poll the endpoint until server/discover answers
+_wait-ready:
+    for _ in $(seq 30); do just _probe >/dev/null 2>&1 && exit 0; sleep 0.2; done; echo "Timed out waiting for {{ endpoint }}" >&2; exit 1
 
-configure configuration="Debug": deps
-    CXX="{{cxx}}" cmake -S . -B build/cmake/{{configuration}} -G Ninja \
-        -DCMAKE_BUILD_TYPE={{configuration}} \
-        -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-        -DVCPKG_MANIFEST_MODE=OFF \
-        -DVCPKG_INSTALLED_DIR="{{justfile_directory()}}/build/deps" \
-        -DVCPKG_TARGET_TRIPLET={{triplet}} \
-        -DENABLE_SANITIZERS={{if configuration == "Debug" { "ON" } else { "OFF" }}}
+# POST server/discover; OAuth-protected, so HTTP 401 with WWW-Authenticate counts as ready
+_probe:
+    out="$(curl -sS -o /dev/null -w '%{http_code} %header{www-authenticate}' -X POST "{{ endpoint }}" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2026-07-28" -H "Mcp-Method: server/discover" -d '{{ discover }}')"; case "$out" in "200 "* | "401 "?*) echo "{{ endpoint }}: HTTP ${out%% *}" ;; *) echo "{{ endpoint }}: unexpected response ${out%% *}" >&2; exit 1 ;; esac
 
-test: (configure "Debug")
-    cmake --build build/cmake/Debug --parallel 2
-    ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error
-
+# Compile the Release binary into build/bin (no tests)
 build: (configure "Release")
     cmake --build build/cmake/Release --parallel 2
-    ctest --test-dir build/cmake/Release --output-on-failure --no-tests=error
 
-lint: (configure "Debug")
-    CLANG_TIDY="${CLANG_TIDY:-clang-tidy}" && "$CLANG_TIDY" -p build/cmake/Debug src/main.cpp tests/test_main.cpp
-
-test-mcp: build
-    node scripts/test-mcp.mjs build/bin/whatsapp-mcp list_chats,list_messages,search_contacts,get_chat,get_direct_chat_by_contact,get_contact_chats,get_message_context,get_last_interaction,send_message,send_file,send_audio_message,download_media,export,sql,schema,status
-
-run *args:
-    ./build/bin/whatsapp-mcp "$@"
-
+# Remove build output
 clean:
     rm -rf build
+
+# Configure CMake (Debug enables ASan + UBSan)
+configure configuration="Debug": deps
+    CXX="{{ cxx }}" cmake -S . -B build/cmake/{{ configuration }} -G Ninja -DCMAKE_BUILD_TYPE={{ configuration }} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR="{{ justfile_directory() }}/build/deps" -DVCPKG_TARGET_TRIPLET={{ triplet }} -DENABLE_SANITIZERS={{ if configuration == "Debug" { "ON" } else { "OFF" } }}
+
+# Install vcpkg dependencies into build/deps
+deps:
+    {{ deps_env }}vcpkg install --x-wait-for-lock --overlay-triplets=triplets --triplet={{ triplet }} --x-install-root=build/deps
+
+# Check required tools, C++26 support and env vars, printing fixes
+doctor:
+    LLVM_BIN="{{ llvm }}" bash scripts/doctor.sh {{ required }}
+
+# Format C++ sources and this justfile
+fmt:
+    git ls-files -co --exclude-standard '*.cpp' '*.hpp' | xargs "{{ llvm }}/clang-format" -i
+    just --fmt --unstable
+
+# Check formatting, then lint with clang-tidy
+lint: (configure "Debug")
+    git ls-files -co --exclude-standard '*.cpp' '*.hpp' | xargs "{{ llvm }}/clang-format" --dry-run --Werror
+    just --fmt --check --unstable
+    "{{ llvm }}/clang-tidy" -p build/cmake/Debug src/main.cpp
+
+# Debug build with ASan + UBSan, then run all tests, or only doctest cases matching filter
+test filter="": (configure "Debug")
+    if [ -z "$1" ]; then cmake --build build/cmake/Debug --parallel 2 && BUGSINK_DSN= ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error; else cmake --build build/cmake/Debug --target {{ test_target }} --parallel 2 && BUGSINK_DSN= build/cmake/Debug/{{ test_target }} -tc="$1"; fi
+
+# Isolated MCP stdio + HTTP startup check against build/bin
+test-mcp: build
+    bun scripts/test-mcp.ts build/bin/{{ formula }} {{ tools }}
+
+# Move vcpkg registry baselines to latest, then run tests (no commit)
+upgrade-deps:
+    git -C "$VCPKG_ROOT" pull --ff-only
+    vcpkg x-update-baseline --x-install-root=build/deps
+    just test

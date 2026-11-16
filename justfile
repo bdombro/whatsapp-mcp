@@ -1,89 +1,101 @@
-# WhatsApp plugin top-level tasks
-set shell := ["zsh", "-f", "-eu", "-o", "pipefail", "-c"]
+# WhatsApp plugin: whatsapp-client (Go sync daemon) + whatsapp-mcp (C++26 MCP server)
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set positional-arguments
 
-# List recipes
+formulas := "whatsapp-client whatsapp-mcp"
+platforms := "macos linux"
+required := "brew bun cmake gh git go jq just ninja vcpkg"
+
 _:
     @just --list
 
-# Run tests across client (Go) and mcp (C++26)
-test:
-    @echo "=== Running Go client tests ==="
-    just --justfile client/justfile test
-    @echo "=== Running C++26 MCP tests ==="
-    just --justfile mcp/justfile test
-
-# Build binaries for both client and mcp
+# Compile the Go client into client/dist and the C++ Release binary into mcp/build/bin (no tests)
 build:
-    @echo "=== Building Go client ==="
     just --justfile client/justfile build
-    @echo "=== Building C++26 MCP ==="
     just --justfile mcp/justfile build
 
-deps:
-    just --justfile mcp/justfile deps
-
-configure configuration="Debug":
-    just --justfile mcp/justfile configure {{configuration}}
-
-lint:
-    just --justfile mcp/justfile lint
-
-test-mcp:
-    just --justfile mcp/justfile test-mcp
-
-run *args:
-    ./mcp/build/bin/whatsapp-mcp "$@"
-
-# Clean build artifacts
+# Remove client and mcp build output
 clean:
     just --justfile client/justfile clean
     just --justfile mcp/justfile clean
 
-# Check daemon and MCP status
-status:
-    @echo "=== Daemon Status ==="
-    @if [ -x client/dist/whatsapp-client ]; then \
-        client/dist/whatsapp-client status; \
-    elif command -v whatsapp-client >/dev/null 2>&1; then \
-        whatsapp-client status; \
-    else \
-        echo "whatsapp-client not found in client/dist or PATH"; \
-    fi
-    @echo "=== MCP Status ==="
-    @if [ -x mcp/build/bin/whatsapp-mcp ]; then \
-        mcp/build/bin/whatsapp-mcp status '{"json":true}'; \
-    elif command -v whatsapp-mcp >/dev/null 2>&1; then \
-        whatsapp-mcp status '{"json":true}'; \
-    else \
-        echo "whatsapp-mcp not built or installed in PATH"; \
-    fi
-
-# Install release Homebrew formula (pass "whatsapp-mcp whatsapp-client" to include client)
-install *formulas:
-    node scripts/dev-formula.mjs install {{formulas}}
-
-# Stage local binary tarball into bdombro/whatsapp-mcp tap and install (default: whatsapp-mcp)
-install-local *formulas:
-    node scripts/dev-formula.mjs install-local {{formulas}}
-
-# Stop whatsapp-mcp if running, reinstall from local build, and restart if previously running
-reinstall-local *formulas:
-    node scripts/dev-formula.mjs reinstall-local {{formulas}}
-
-# Start/stop/restart only the whatsapp-mcp HTTP service (never spawns duplicate whatsapp-client)
-start:
-    HOMEBREW_NO_AUTO_UPDATE=1 brew services start bdombro/whatsapp-mcp/whatsapp-mcp
-
-stop:
-    HOMEBREW_NO_AUTO_UPDATE=1 brew services stop bdombro/whatsapp-mcp/whatsapp-mcp
-
-restart:
-    HOMEBREW_NO_AUTO_UPDATE=1 brew services restart bdombro/whatsapp-mcp/whatsapp-mcp
-
-uninstall:
-    HOMEBREW_NO_AUTO_UPDATE=1 brew uninstall bdombro/whatsapp-mcp/whatsapp-mcp
-
-# Perform safe single-daemon cutover from com.bdombro.whatsapp-mcp to com.bdombro.whatsapp-client
+# One-time migration from the legacy com.bdombro.whatsapp-mcp LaunchAgent to com.bdombro.whatsapp-client
 cutover: build
     @scripts/cutover.sh
+
+# Follow both service logs
+daemon-logs:
+    prefix="$(brew --prefix)"; tail -n 100 -f "$prefix/var/log/whatsapp-client.log" "$prefix/var/log/whatsapp-mcp.log"
+
+# Restart both services and wait until whatsapp-mcp is ready
+daemon-restart:
+    for f in {{ formulas }}; do brew services stop "$f"; done
+    for f in {{ formulas }}; do brew services start "$f"; done
+    just --justfile mcp/justfile _wait-ready
+
+# Register both services to run at login, start them, and wait until whatsapp-mcp is ready
+daemon-start:
+    for f in {{ formulas }}; do brew services start "$f"; done
+    just --justfile mcp/justfile _wait-ready
+
+# Show both brew service states and probe the live whatsapp-mcp endpoint
+daemon-status:
+    for f in {{ formulas }}; do brew services info "$f" || true; done
+    just --justfile mcp/justfile _probe
+
+# Stop both services and unregister them, so they won't start at login
+daemon-stop:
+    for f in {{ formulas }}; do brew services stop "$f"; done
+
+# Check required tools (incl. Go), C++26 support and env vars, printing fixes
+doctor:
+    LLVM_BIN="$(just --justfile mcp/justfile --evaluate llvm)" bash mcp/scripts/doctor.sh {{ required }}
+
+# Format C++ sources, Go sources and justfiles
+fmt:
+    just --justfile mcp/justfile fmt
+    gofmt -w client
+    just --fmt --unstable
+    just --justfile client/justfile --fmt --unstable
+
+# Clean-install both released binaries from GitHub exactly as users do, test them, then start both services
+install: uninstall
+    brew tap bdombro/whatsapp-mcp https://github.com/bdombro/whatsapp-mcp
+    for f in {{ formulas }}; do brew install "bdombro/whatsapp-mcp/$f"; done
+    for f in {{ formulas }}; do brew test "bdombro/whatsapp-mcp/$f"; done
+    just daemon-start
+
+# Check formatting, then lint C++ with clang-tidy
+lint:
+    just --justfile mcp/justfile lint
+    test -z "$(gofmt -l client)" || { gofmt -l client; echo "gofmt: run just fmt" >&2; exit 1; }
+    just --fmt --check --unstable
+    just --justfile client/justfile --fmt --check --unstable
+
+# Release on GitHub (tests per platform, version bump, changelog, build, both formulas, tag), then pull the release commit
+release bump:
+    gh workflow run release.yml -f bump="$1"
+    sleep 5; id="$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"; if [ -t 1 ]; then gh run watch --compact --exit-status "$id"; else gh run watch --exit-status "$id" >/dev/null; fi || { gh run view "$id" --log-failed | tail -n 100; exit 1; }
+    git pull --ff-only
+
+# Run Go client tests, then the C++ Debug ASan + UBSan tests
+test:
+    just --justfile client/justfile test
+    just --justfile mcp/justfile test
+
+# Isolated MCP stdio + HTTP startup check against mcp/build/bin
+test-mcp:
+    just --justfile mcp/justfile test-mcp
+
+# Stop both services, uninstall both formulas, remove the tap
+uninstall:
+    for f in {{ formulas }}; do brew services stop "$f" || true; done
+    for f in {{ formulas }}; do brew uninstall "$f" || true; done
+    brew untap bdombro/whatsapp-mcp || true
+
+# Move vcpkg baselines and Go modules to latest, then run tests (no commit)
+upgrade-deps:
+    just --justfile mcp/justfile upgrade-deps
+    go -C client get -u ./...
+    go -C client mod tidy
+    just --justfile client/justfile test

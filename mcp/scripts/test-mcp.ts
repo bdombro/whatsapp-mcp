@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 // End-to-end MCP contract verification (2026-07-28 stdio + HTTP/OAuth smoke).
-// Usage: node scripts/test-mcp.mjs [path/to/whatsapp-mcp]
+// Usage: bun scripts/test-mcp.ts <path/to/whatsapp-mcp> <comma-separated-tools>
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -8,40 +7,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const mcpDir = path.resolve(__dirname, "..");
-const binPath = path.resolve(
-  mcpDir,
-  process.argv[2] || "build/bin/whatsapp-mcp",
-);
+const [executable, expected] = process.argv.slice(2);
+assert(executable && expected, "Usage: test-mcp.ts <executable> <comma-separated-tools>");
+const binPath = path.resolve(executable);
+const expectedTools = expected.split(",").filter(Boolean);
 
 if (!fs.existsSync(binPath)) {
   console.error(`Binary not found: ${binPath}`);
   process.exit(1);
 }
 
-const EXPECTED_TOOLS = [
-  "list_chats",
-  "list_messages",
-  "search_contacts",
-  "get_chat",
-  "get_direct_chat_by_contact",
-  "get_contact_chats",
-  "get_message_context",
-  "get_last_interaction",
-  "send_message",
-  "send_file",
-  "send_audio_message",
-  "download_media",
-  "export",
-  "sql",
-  "schema",
-  "status",
-];
-
-function makeIsolatedEnv(tmpDir) {
+function makeIsolatedEnv(tmpDir: string): Record<string, string | undefined> {
   return {
     ...process.env,
     BUGSINK_DSN: "",
@@ -49,7 +26,7 @@ function makeIsolatedEnv(tmpDir) {
   };
 }
 
-async function testStdio(tmpDir) {
+async function testStdio(tmpDir: string): Promise<void> {
   const proc = spawn(binPath, ["mcp"], {
     env: makeIsolatedEnv(tmpDir),
     stdio: ["pipe", "pipe", "pipe"],
@@ -61,25 +38,25 @@ async function testStdio(tmpDir) {
   });
 
   const rl = readline.createInterface({ input: proc.stdout });
-  const pending = new Map();
+  const pending = new Map<number, { resolve: (msg: any) => void }>();
   rl.on("line", (line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
-    let msg;
+    let msg: any;
     try {
       msg = JSON.parse(trimmed);
-    } catch (err) {
+    } catch {
       return;
     }
     if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve } = pending.get(msg.id);
+      const { resolve } = pending.get(msg.id)!;
       pending.delete(msg.id);
       resolve(msg);
     }
   });
 
   let nextId = 1;
-  const rpc = (method, params = {}) =>
+  const rpc = (method: string, params: Record<string, unknown> = {}): Promise<any> =>
     new Promise((resolve, reject) => {
       const id = nextId++;
       const timer = setTimeout(() => {
@@ -92,9 +69,7 @@ async function testStdio(tmpDir) {
           resolve(msg);
         },
       });
-      proc.stdin.write(
-        `${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
-      );
+      proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     });
 
   const meta = {
@@ -107,15 +82,12 @@ async function testStdio(tmpDir) {
     assert.ok(disc.result, `Expected result from server/discover: ${JSON.stringify(disc)}`);
     assert.equal(disc.result.resultType, "complete");
     assert.ok(disc.result.supportedVersions?.includes("2026-07-28"));
-    assert.equal(
-      disc.result._meta?.["io.modelcontextprotocol/serverInfo"]?.name,
-      "whatsapp-mcp",
-    );
+    assert.equal(disc.result._meta?.["io.modelcontextprotocol/serverInfo"]?.name, "whatsapp-mcp");
 
     const listed = await rpc("tools/list", { _meta: meta });
     assert.ok(listed.result?.tools, `Expected tools array: ${JSON.stringify(listed)}`);
-    const names = listed.result.tools.map((t) => t.name).sort();
-    assert.deepEqual(names, [...EXPECTED_TOOLS].sort());
+    const names = listed.result.tools.map((t: { name: string }) => t.name).sort();
+    assert.deepEqual(names, [...expectedTools].sort());
 
     const legacy = await rpc("initialize", {
       protocolVersion: "2024-11-05",
@@ -137,7 +109,7 @@ async function testStdio(tmpDir) {
   } finally {
     rl.close();
     proc.stdin.end();
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         proc.kill("SIGKILL");
         resolve();
@@ -148,25 +120,21 @@ async function testStdio(tmpDir) {
       });
     });
   }
-  console.log("PASS stdio (2026-07-28 server/discover, 16 tools, legacy -32601)");
+  console.log(`PASS stdio (2026-07-28 server/discover, ${expectedTools.length} tools, legacy -32601)`);
 }
 
-async function testHttpOAuthSmoke(tmpDir) {
-  const proc = spawn(
-    binPath,
-    ["http", "--host", "127.0.0.1", "--port", "0", "--allow-ephemeral-port"],
-    {
-      env: makeIsolatedEnv(tmpDir),
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+async function testHttpOAuthSmoke(tmpDir: string): Promise<void> {
+  const proc = spawn(binPath, ["http", "--host", "127.0.0.1", "--port", "0", "--allow-ephemeral-port"], {
+    env: makeIsolatedEnv(tmpDir),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
   let logs = "";
-  const baseUrl = await new Promise((resolve, reject) => {
+  const baseUrl = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`Timed out waiting for HTTP listener URL. Logs:\n${logs}`));
     }, 5000);
-    const onData = (chunk) => {
+    const onData = (chunk: Buffer) => {
       logs += chunk.toString();
       const match = logs.match(/http:\/\/127\.0\.0\.1:(\d+)\/mcp/);
       if (match) {
@@ -205,14 +173,14 @@ async function testHttpOAuthSmoke(tmpDir) {
 
     const prmResp = await fetch(`${baseUrl}/.well-known/oauth-protected-resource`);
     assert.equal(prmResp.status, 200);
-    const prm = await prmResp.json();
+    const prm: any = await prmResp.json();
     assert.equal(prm.resource, `${baseUrl}/mcp`);
     assert.ok(Array.isArray(prm.authorization_servers));
     assert.equal(prm.authorization_servers[0], baseUrl);
 
     const asResp = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
     assert.equal(asResp.status, 200);
-    const asMeta = await asResp.json();
+    const asMeta: any = await asResp.json();
     assert.equal(asMeta.issuer, baseUrl);
     assert.equal(asMeta.authorization_endpoint, `${baseUrl}/authorize`);
     assert.equal(asMeta.token_endpoint, `${baseUrl}/token`);
@@ -231,10 +199,10 @@ async function testHttpOAuthSmoke(tmpDir) {
       }),
     });
     assert.equal(dcrResp.status, 201);
-    const dcr = await dcrResp.json();
+    const dcr: any = await dcrResp.json();
     assert.ok(typeof dcr.client_id === "string" && dcr.client_id.length > 0);
   } finally {
-    const exitCode = await new Promise((resolve) => {
+    const exitCode = await new Promise<number>((resolve) => {
       const timer = setTimeout(() => {
         proc.kill("SIGKILL");
         resolve(-1);
@@ -250,12 +218,12 @@ async function testHttpOAuthSmoke(tmpDir) {
   console.log("PASS http (401 + WWW-Authenticate, RFC 9728, RFC 8414, DCR, SIGTERM exit 0)");
 }
 
-async function testNonLoopbackRefused(tmpDir) {
+async function testNonLoopbackRefused(tmpDir: string): Promise<void> {
   const proc = spawn(binPath, ["http", "--host", "0.0.0.0", "--port", "10008"], {
     env: makeIsolatedEnv(tmpDir),
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const code = await new Promise((resolve) => {
+  const code = await new Promise<number>((resolve) => {
     const timer = setTimeout(() => {
       proc.kill("SIGKILL");
       resolve(-1);

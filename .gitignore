@@ -2,5 +2,4 @@
 /client/dist/
 /mcp/bin/
 /mcp/dist/
-/.ci/
-/Formula/.staging/
+/dist/
