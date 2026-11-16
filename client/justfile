@@ -12,7 +12,7 @@ test:
 # Build binary
 build:
     mkdir -p dist
-    go build -ldflags "-X 'main.BuildTime=$(date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'main.BuildVersion=$(git describe --tags --always --dirty 2>/dev/null || echo dev)'" -o dist/whatsapp-client .
+    go build -ldflags "-X 'main.BuildTime=$(date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'main.BuildVersion=$(cat ../VERSION)'" -o dist/whatsapp-client .
 
 # Clean build artifacts
 clean:

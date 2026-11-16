@@ -670,6 +670,25 @@ TEST_CASE("data dir resolution") {
     }
 }
 
+TEST_CASE("version and Bugsink release come from VERSION") {
+    auto app = make_whatsapp_app();
+    const std::string meta =
+        R"("_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}})";
+
+    const auto disc = app.dispatchMcpJson(
+        parse_json_ok(R"({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{)" + meta + "}}"));
+    CHECK(disc["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["version"].get_string() == WHATSAPP_APP_VERSION);
+
+    REQUIRE(app.bugsink() != nullptr);
+    CHECK(app.bugsink()->release() == std::string("whatsapp-mcp@") + WHATSAPP_APP_VERSION);
+    CHECK(app.bugsink()->effectiveDsn().empty());
+
+    const auto call = app.dispatchMcpJson(parse_json_ok(
+        R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"status","arguments":{},)" + meta + "}}"));
+    const auto status = parse_json_ok(call["result"]["content"][0]["text"].get_string());
+    CHECK(status["version"].get_string() == WHATSAPP_APP_VERSION);
+}
+
 // ---------------- QR SVG Tests ----------------
 
 TEST_CASE("qr_to_svg encoding and structure") {

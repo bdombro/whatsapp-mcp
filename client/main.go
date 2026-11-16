@@ -28,7 +28,7 @@ func runMode(args []string) string {
 
 // main starts error reporting, then hands process args to CLI dispatch.
 func main() {
-	core.InitBugsink(BuildVersion, runMode(os.Args[1:]))
+	core.InitBugsink("whatsapp-client@"+BuildVersion, runMode(os.Args[1:]))
 	defer core.Flush()
 	defer core.RecoverReport()
 	dispatchCLI(os.Args[1:])
