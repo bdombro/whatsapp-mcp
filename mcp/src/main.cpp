@@ -5,7 +5,6 @@
 #include <mcp_http.hpp>
 
 #include <cstdlib>
-#include <cstring>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -48,20 +47,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    bool isMcpMode = false;
-    for (size_t i = 1; i < filteredArgv.size(); ++i) {
-        if (std::strcmp(filteredArgv[i], "--skip-checks") == 0)
-            continue;
-        isMcpMode = (std::strcmp(filteredArgv[i], "mcp") == 0);
-        break;
-    }
-
     std::unique_ptr<app_log::LogFileGuard> logGuard;
     if (logFile.has_value()) {
-        if (isMcpMode) {
-            std::cerr << "--log-file cannot be used with mcp stdio mode\n";
-            return 1;
-        }
         auto opened = app_log::LogFileGuard::open(*logFile);
         if (!opened) {
             std::cerr << opened.error() << "\n";
@@ -87,7 +74,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    slimr::HttpServerOptions httpOpts;
+    slimr::McpHttpOptions httpOpts;
     httpOpts.host = "0.0.0.0";
     httpOpts.port = 10008;
 

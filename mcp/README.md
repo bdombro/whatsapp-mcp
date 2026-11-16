@@ -66,14 +66,14 @@ After starting the service, add this server to OpenCode v2.2.6's
 ```
 
 Use either an explicit server entry or a plugin manifest, not both.
-Alternative client schemas and stdio configuration are in the
+Alternative client schemas are in the
 [developer reference](docs/development.md). The compatibility notice above
 applies to every transport.
 
 
 ## Tools & CLI Commands
 
-Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `0.0.0.0:10008`), stdio MCP (`whatsapp-mcp mcp`, protocol `2026-07-28`), and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`).
+Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `0.0.0.0:10008`) and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`).
 
 | Tool | Scope | Kind | Description |
 | --- | --- | --- | --- |

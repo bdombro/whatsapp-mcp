@@ -48,7 +48,7 @@ plugins/whatsapp-mcp/
     │   ├── app.hpp           # `whatsapp::make_whatsapp_app()` registering all 16 tools & Bugsink DSN
     │   ├── oauth_as.hpp      # OAuth 2.1 + PKCE AS & browser QR/approval flow
     │   ├── qr_svg.hpp        # Standalone QR encoder for browser pairing SVG
-    │   └── main.cpp          # Standalone CLI, stdio MCP (`mcp`), and HTTP/OAuth (`http`) entrypoint
+    │   └── main.cpp          # Standalone CLI and HTTP/OAuth (`http`) entrypoint
     └── tests/
         └── test_main.cpp     # ASan + UBSan tests for `wa_utc`, key isolation, FTS5, views, export & allowlist
 ```
@@ -69,19 +69,16 @@ plugins/whatsapp-mcp/
 
 ## `.mcp.json` Configuration
 
-`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `0.0.0.0:10008`, `http://127.0.0.1:10008/mcp` locally, with OAuth 2.1 + PKCE and a browser QR/approval UI), stdio (`whatsapp-mcp mcp`, protocol `2026-07-28`), or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
+`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `0.0.0.0:10008`, `http://127.0.0.1:10008/mcp` locally, with OAuth 2.1 + PKCE and a browser QR/approval UI) or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
 
-To run `whatsapp-mcp` as a standalone MCP server in `.mcp.json`:
+To configure `whatsapp-mcp` over HTTP in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "whatsapp-mcp": {
-      "command": "/absolute/path/to/whatsapp-mcp/mcp/build/bin/whatsapp-mcp",
-      "args": ["mcp"],
-      "env": {
-        "WHATSAPP_CLIENT_DATA_DIR": "/absolute/path/to/whatsapp-client-data"
-      }
+      "type": "http",
+      "url": "http://127.0.0.1:10008/mcp"
     }
   }
 }
@@ -113,7 +110,7 @@ just test              # Go client tests + C++ Debug ASan/UBSan tests (BUGSINK_D
 just build             # client/dist/whatsapp-client and mcp/build/bin/whatsapp-mcp (Release, no tests)
 just fmt               # Format C++, Go, and justfiles
 just lint              # Format checks + clang-tidy (mcp/.clang-tidy)
-just test-mcp          # Bun stdio + ephemeral HTTP MCP 2026-07-28 discovery, isolated from production data
+just test-mcp          # Bun ephemeral HTTP MCP 2026-07-28 discovery, isolated from production data
 just upgrade-deps      # Update vcpkg registry baselines and Go modules, then run tests
 just release patch     # Trigger release.yml (test -> build both binaries -> both formulas -> tag -> GitHub release) and pull
 just install           # Clean-install both released formulas, brew test them, start both services

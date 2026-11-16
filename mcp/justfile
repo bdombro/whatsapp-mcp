@@ -62,7 +62,7 @@ lint: (configure "Debug")
 test filter="": (configure "Debug")
     if [ -z "$1" ]; then cmake --build build/cmake/Debug --parallel 2 && BUGSINK_DSN= ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error; else cmake --build build/cmake/Debug --target {{ test_target }} --parallel 2 && BUGSINK_DSN= build/cmake/Debug/{{ test_target }} -tc="$1"; fi
 
-# Isolated MCP stdio + HTTP startup check against build/bin
+# Isolated MCP HTTP startup check against build/bin
 test-mcp: build
     bun scripts/test-mcp.ts build/bin/{{ formula }} {{ tools }}
 

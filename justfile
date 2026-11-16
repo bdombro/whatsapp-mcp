@@ -83,7 +83,7 @@ test:
     just --justfile client/justfile test
     just --justfile mcp/justfile test
 
-# Isolated MCP stdio + HTTP startup check against mcp/build/bin
+# Isolated MCP HTTP startup check against mcp/build/bin
 test-mcp:
     just --justfile mcp/justfile test-mcp
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Migrate `whatsapp-mcp` to `slimr-serve` typed `OutputStruct` handlers via `slimr-mcp` adapter and drop stdio `mcp` subcommand (HTTP-only MCP + narrow JSON CLI)
 - Fix direct CLI tool calls (`<bin> <tool> '{...}'`), disabled by default since `slimr-mcp` v0.1.4
 - Internal: replace slimr-curl/libhv with cpp-httplib (AF_UNIX daemon client) and upgrade slimr-mcp/slimr-bugsink
 - Internal: switch macOS build to llvm@23 with static libc++

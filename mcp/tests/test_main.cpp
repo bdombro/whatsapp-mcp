@@ -1081,6 +1081,45 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
         CHECK(dj["result"]["supportedVersions"][0].get_string() == "2026-07-28");
         CHECK(dj["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"].get_string() == "whatsapp-mcp");
 
+        auto listed = http_request(
+            port,
+            "POST",
+            "/mcp",
+            {{"Content-Type", "application/json"},
+             {"Accept", "application/json, text/event-stream"},
+             {"MCP-Protocol-Version", "2026-07-28"},
+             {"Mcp-Method", "tools/list"},
+             {"Authorization", "Bearer " + readToken}},
+            R"({"jsonrpc":"2.0","id":21,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})");
+        REQUIRE(listed.status == 200);
+        auto lj = parse_json_ok(listed.body);
+        REQUIRE(lj["result"]["tools"].get_array().size() == 16);
+        for (const auto &t : lj["result"]["tools"].get_array()) {
+            const std::string tname = t["name"].get_string();
+            if (tname == "list_chats" || tname == "search_contacts" || tname == "get_chat" ||
+                tname == "get_direct_chat_by_contact" || tname == "get_contact_chats" ||
+                tname == "send_message" || tname == "send_file" || tname == "send_audio_message" ||
+                tname == "status") {
+                CHECK(t.contains("outputSchema"));
+            } else if (tname == "download_media") {
+                CHECK_FALSE(t.contains("outputSchema"));
+            }
+        }
+
+        auto resListed = http_request(
+            port,
+            "POST",
+            "/mcp",
+            {{"Content-Type", "application/json"},
+             {"Accept", "application/json, text/event-stream"},
+             {"MCP-Protocol-Version", "2026-07-28"},
+             {"Mcp-Method", "resources/list"},
+             {"Authorization", "Bearer " + readToken}},
+            R"({"jsonrpc":"2.0","id":22,"method":"resources/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})");
+        REQUIRE(resListed.status == 200);
+        auto rlj = parse_json_ok(resListed.body);
+        CHECK(rlj["result"]["resources"].get_array().empty());
+
         auto readCall = http_request(
             port,
             "POST",

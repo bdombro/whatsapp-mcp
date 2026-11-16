@@ -51,10 +51,32 @@ class WhatsappMcp < Formula
   end
 
   test do
+    require "net/http"
     assert_match version.to_s, shell_output("#{bin}/whatsapp-mcp --version")
-    discover = '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
     env = { "BUGSINK_DSN" => "", "WHATSAPP_CLIENT_DATA_DIR" => testpath.to_s }
-    out = with_env(env) { pipe_output("#{bin}/whatsapp-mcp mcp --skip-checks", "#{discover}\n") }
-    assert_match "whatsapp-mcp", out
+    r, w = IO.pipe
+    pid = spawn(env, "#{bin}/whatsapp-mcp", "--skip-checks", "http", "--host", "127.0.0.1", "--port", "0", err: w)
+    w.close
+    begin
+      port = nil
+      r.each_line { |line| break if (port = line[%r{listening on http://[\d.]+:(\d+)/mcp}, 1]) }
+      assert port, "server did not report a listening port"
+
+      prm = Net::HTTP.get_response(URI("http://127.0.0.1:#{port}/.well-known/oauth-protected-resource"))
+      assert_equal "200", prm.code
+      assert_match "http://127.0.0.1:#{port}/mcp", prm.body
+
+      discover = '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+      res = Net::HTTP.post(URI("http://127.0.0.1:#{port}/mcp"), discover,
+                           "Content-Type"         => "application/json",
+                           "Accept"               => "application/json, text/event-stream",
+                           "MCP-Protocol-Version" => "2026-07-28",
+                           "Mcp-Method"           => "server/discover")
+      assert_equal "401", res.code
+      assert_match "resource_metadata=", res["www-authenticate"].to_s
+    ensure
+      Process.kill("TERM", pid)
+      Process.wait(pid)
+    end
   end
 end

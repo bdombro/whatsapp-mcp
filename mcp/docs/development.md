@@ -58,7 +58,7 @@ just test "<filter>"   # Build the test target and run matching doctest cases
 just build             # Optimized IPO Release binary at build/bin/whatsapp-mcp (no tests)
 just fmt               # Format C++ sources and justfile
 just lint              # Format check + clang-tidy (.clang-tidy)
-just test-mcp          # Bun stdio + ephemeral HTTP MCP 2026-07-28 discovery (OAuth-protected), isolated
+just test-mcp          # Bun ephemeral HTTP MCP 2026-07-28 discovery (OAuth-protected), isolated
 just clean             # Remove build/ only; leaves user data untouched
 ```
 

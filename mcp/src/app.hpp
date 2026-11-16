@@ -109,6 +109,18 @@ inline slimr::IterateResult query_sql(const std::string &dataDir, const std::str
 
 // ---------------- MCP Plugin App ----------------
 
+inline ChatOutput to_chat_output(const ChatRow &c) {
+    ChatOutput out;
+    out.jid = c.jid;
+    out.name = c.name;
+    out.is_group = c.is_group;
+    out.last_message_time = c.last_message_time;
+    out.last_message = c.last_message;
+    out.last_sender = c.last_sender;
+    out.last_is_from_me = c.last_is_from_me;
+    return out;
+}
+
 inline slimr::PluginApp make_whatsapp_app() {
     slimr::PluginApp app("whatsapp-mcp", WHATSAPP_APP_VERSION);
     app.description = "WhatsApp MCP server and narrow JSON CLI.";
@@ -136,7 +148,7 @@ inline slimr::PluginApp make_whatsapp_app() {
         "list_chats",
         "Get WhatsApp chats matching specified criteria. Supports fuzzy search by chat name or participant name.",
         readOpts,
-        [](const ListChatsInput &in) -> slimr::Json {
+        [](const ListChatsInput &in) -> ListChatsOutput {
             std::string dir = resolve_data_dir();
             int limit = in.limit.get().value_or(20);
             int page = in.page.get().value_or(0);
@@ -144,23 +156,12 @@ inline slimr::PluginApp make_whatsapp_app() {
             std::string sort = in.sort_by.get().value_or("last_active");
             auto chats = get_db(dir).listChats(in.query.get(), limit, page, incLast, sort);
 
-            slimr::Json arr = slimr::Json::array_t{};
+            ListChatsOutput out;
+            out.chats.get().reserve(chats.size());
             for (const auto &c : chats) {
-                slimr::Json item = slimr::Json::object_t{};
-                item["jid"] = c.jid;
-                item["name"] = c.name;
-                item["is_group"] = c.is_group;
-                if (c.last_message_time)
-                    item["last_message_time"] = *c.last_message_time;
-                if (c.last_message)
-                    item["last_message"] = *c.last_message;
-                if (c.last_sender)
-                    item["last_sender"] = *c.last_sender;
-                if (c.last_is_from_me)
-                    item["last_is_from_me"] = *c.last_is_from_me;
-                arr.get_array().push_back(std::move(item));
+                out.chats.get().push_back(to_chat_output(c));
             }
-            return arr;
+            return out;
         });
 
     // 2. list_messages
@@ -185,18 +186,19 @@ inline slimr::PluginApp make_whatsapp_app() {
         "search_contacts",
         "Search WhatsApp contacts by name or phone number.",
         readOpts,
-        [](const SearchContactsInput &in) -> slimr::Json {
+        [](const SearchContactsInput &in) -> SearchContactsOutput {
             std::string dir = resolve_data_dir();
             auto contacts = get_db(dir).searchContacts(in.query.get());
-            slimr::Json arr = slimr::Json::array_t{};
+            SearchContactsOutput out;
+            out.contacts.get().reserve(contacts.size());
             for (const auto &c : contacts) {
-                slimr::Json item = slimr::Json::object_t{};
-                item["phone_number"] = c.phone_number;
-                item["name"] = c.name;
-                item["jid"] = c.jid;
-                arr.get_array().push_back(std::move(item));
+                ContactOutput item;
+                item.phone_number = c.phone_number;
+                item.name = c.name;
+                item.jid = c.jid;
+                out.contacts.get().push_back(std::move(item));
             }
-            return arr;
+            return out;
         });
 
     // 4. get_chat
@@ -204,23 +206,10 @@ inline slimr::PluginApp make_whatsapp_app() {
         "get_chat",
         "Get WhatsApp chat metadata by JID.",
         readOpts,
-        [](const GetChatInput &in) -> slimr::Json {
+        [](const GetChatInput &in) -> ChatOutput {
             std::string dir = resolve_data_dir();
             bool incLast = in.include_last_message.get().value_or(true);
-            auto c = get_db(dir).getChat(in.chat_jid.get(), incLast);
-            slimr::Json item = slimr::Json::object_t{};
-            item["jid"] = c.jid;
-            item["name"] = c.name;
-            item["is_group"] = c.is_group;
-            if (c.last_message_time)
-                item["last_message_time"] = *c.last_message_time;
-            if (c.last_message)
-                item["last_message"] = *c.last_message;
-            if (c.last_sender)
-                item["last_sender"] = *c.last_sender;
-            if (c.last_is_from_me)
-                item["last_is_from_me"] = *c.last_is_from_me;
-            return item;
+            return to_chat_output(get_db(dir).getChat(in.chat_jid.get(), incLast));
         });
 
     // 5. get_direct_chat_by_contact
@@ -228,22 +217,9 @@ inline slimr::PluginApp make_whatsapp_app() {
         "get_direct_chat_by_contact",
         "Get WhatsApp chat metadata by sender phone number.",
         readOpts,
-        [](const GetDirectChatByContactInput &in) -> slimr::Json {
+        [](const GetDirectChatByContactInput &in) -> ChatOutput {
             std::string dir = resolve_data_dir();
-            auto c = get_db(dir).getDirectChatByContact(in.sender_phone_number.get());
-            slimr::Json item = slimr::Json::object_t{};
-            item["jid"] = c.jid;
-            item["name"] = c.name;
-            item["is_group"] = c.is_group;
-            if (c.last_message_time)
-                item["last_message_time"] = *c.last_message_time;
-            if (c.last_message)
-                item["last_message"] = *c.last_message;
-            if (c.last_sender)
-                item["last_sender"] = *c.last_sender;
-            if (c.last_is_from_me)
-                item["last_is_from_me"] = *c.last_is_from_me;
-            return item;
+            return to_chat_output(get_db(dir).getDirectChatByContact(in.sender_phone_number.get()));
         });
 
     // 6. get_contact_chats
@@ -251,28 +227,17 @@ inline slimr::PluginApp make_whatsapp_app() {
         "get_contact_chats",
         "Get all WhatsApp chats involving the contact.",
         readOpts,
-        [](const GetContactChatsInput &in) -> slimr::Json {
+        [](const GetContactChatsInput &in) -> ListChatsOutput {
             std::string dir = resolve_data_dir();
             int limit = in.limit.get().value_or(20);
             int page = in.page.get().value_or(0);
             auto chats = get_db(dir).getContactChats(in.jid.get(), limit, page);
-            slimr::Json arr = slimr::Json::array_t{};
+            ListChatsOutput out;
+            out.chats.get().reserve(chats.size());
             for (const auto &c : chats) {
-                slimr::Json item = slimr::Json::object_t{};
-                item["jid"] = c.jid;
-                item["name"] = c.name;
-                item["is_group"] = c.is_group;
-                if (c.last_message_time)
-                    item["last_message_time"] = *c.last_message_time;
-                if (c.last_message)
-                    item["last_message"] = *c.last_message;
-                if (c.last_sender)
-                    item["last_sender"] = *c.last_sender;
-                if (c.last_is_from_me)
-                    item["last_is_from_me"] = *c.last_is_from_me;
-                arr.get_array().push_back(std::move(item));
+                out.chats.get().push_back(to_chat_output(c));
             }
-            return arr;
+            return out;
         });
 
     // 7. get_message_context
@@ -303,7 +268,7 @@ inline slimr::PluginApp make_whatsapp_app() {
         "send_message",
         "Send a WhatsApp message to a person or group. For group chats use the JID.",
         writeOpts,
-        [](const SendMessageInput &in) -> slimr::Json {
+        [](const SendMessageInput &in) -> SendResultOutput {
             std::string msg = in.message.get();
             if (utf8_rune_count(msg) > 4000) {
                 throw std::runtime_error("message exceeds maximum length of 4000 characters");
@@ -313,7 +278,7 @@ inline slimr::PluginApp make_whatsapp_app() {
 
             std::string sock = resolve_socket_path(dir);
             auto res = daemon_send(sock, in.recipient.get(), msg);
-            return slimr::Json{{"success", res.success}, {"message", res.message}};
+            return SendResultOutput{.success = res.success, .message = res.message};
         });
 
     // 10. send_file
@@ -321,14 +286,14 @@ inline slimr::PluginApp make_whatsapp_app() {
         "send_file",
         "Send a file via WhatsApp. For group messages use the JID.",
         writeOpts,
-        [](const SendFileInput &in) -> slimr::Json {
+        [](const SendFileInput &in) -> SendResultOutput {
             std::string validPath = validate_sendable_path(in.media_path.get());
             std::string dir = resolve_data_dir();
             log_audit(dir, "whatsapp_send_file", slimr::Json{{"recipient", in.recipient.get()}, {"media_path", in.media_path.get()}});
 
             std::string sock = resolve_socket_path(dir);
             auto res = daemon_send(sock, in.recipient.get(), "", validPath);
-            return slimr::Json{{"success", res.success}, {"message", res.message}};
+            return SendResultOutput{.success = res.success, .message = res.message};
         });
 
     // 11. send_audio_message
@@ -336,14 +301,14 @@ inline slimr::PluginApp make_whatsapp_app() {
         "send_audio_message",
         "Send an audio file as a WhatsApp voice message (ogg/opus plays best).",
         writeOpts,
-        [](const SendAudioMessageInput &in) -> slimr::Json {
+        [](const SendAudioMessageInput &in) -> SendResultOutput {
             std::string validPath = validate_sendable_path(in.media_path.get());
             std::string dir = resolve_data_dir();
             log_audit(dir, "whatsapp_send_audio_message", slimr::Json{{"recipient", in.recipient.get()}, {"media_path", in.media_path.get()}});
 
             std::string sock = resolve_socket_path(dir);
             auto res = daemon_send(sock, in.recipient.get(), "", validPath);
-            return slimr::Json{{"success", res.success}, {"message", res.message}};
+            return SendResultOutput{.success = res.success, .message = res.message};
         });
 
     // 12. download_media
@@ -464,12 +429,13 @@ inline slimr::PluginApp make_whatsapp_app() {
         "status",
         "Show WhatsApp MCP plugin status.",
         readOpts,
-        [](const StatusInput &) -> slimr::Json {
-            slimr::Json j = slimr::Json::object_t{};
-            j["version"] = WHATSAPP_APP_VERSION;
-            j["data_dir"] = resolve_data_dir();
-            j["daemon_socket"] = resolve_socket_path(resolve_data_dir());
-            return j;
+        [](const StatusInput &) -> StatusOutput {
+            std::string dataDir = resolve_data_dir();
+            return StatusOutput{
+                .version = WHATSAPP_APP_VERSION,
+                .data_dir = dataDir,
+                .daemon_socket = resolve_socket_path(dataDir),
+            };
         });
 
     return app;

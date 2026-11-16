@@ -145,4 +145,39 @@ struct StatusInput {
     OptField<std::optional<bool>, "CLI only: print JSON instead of text. MCP always returns JSON."> json;
 };
 
+struct ChatOutput {
+    Field<std::string, "Chat JID"> jid;
+    Field<std::string, "Chat display name"> name;
+    Field<bool, "Whether this is a group chat"> is_group{false};
+    OptField<std::optional<std::string>, "Timestamp of the last message"> last_message_time;
+    OptField<std::optional<std::string>, "Text of the last message"> last_message;
+    OptField<std::optional<std::string>, "Sender of the last message"> last_sender;
+    OptField<std::optional<bool>, "Whether the last message was sent by the owner"> last_is_from_me;
+};
+
+struct ListChatsOutput {
+    Field<std::vector<ChatOutput>, "Matching WhatsApp chats"> chats;
+};
+
+struct ContactOutput {
+    Field<std::string, "Contact phone number"> phone_number;
+    Field<std::string, "Contact display name"> name;
+    Field<std::string, "Contact JID"> jid;
+};
+
+struct SearchContactsOutput {
+    Field<std::vector<ContactOutput>, "Matching WhatsApp contacts"> contacts;
+};
+
+struct SendResultOutput {
+    Field<bool, "Whether the send succeeded"> success{false};
+    Field<std::string, "Status or error message"> message;
+};
+
+struct StatusOutput {
+    Field<std::string, "Server version"> version;
+    Field<std::string, "Resolved WhatsApp client data directory"> data_dir;
+    Field<std::string, "Resolved daemon Unix socket path"> daemon_socket;
+};
+
 } // namespace whatsapp

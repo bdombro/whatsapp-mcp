@@ -98,7 +98,7 @@ After starting the service, add this server to OpenCode v2.2.6's
 ```
 
 Use either an explicit server entry or a plugin manifest, not both.
-Alternative client schemas and stdio configuration are in the
+Alternative client schemas are in the
 [developer reference](docs/development.md). The compatibility notice above
 applies to every transport.
 
