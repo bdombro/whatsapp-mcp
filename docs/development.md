@@ -44,7 +44,7 @@ plugins/whatsapp-mcp/
     │   ├── db.hpp            # Session-key isolation (`ATTACH` -> copy `TEMP` tables -> `DETACH`), views, FTS5 & bulk `export`
     │   ├── allowlist.hpp     # Safe file path containment for `send_file` and `send_audio_message`
     │   ├── audit.hpp         # Append-only `mcp-audit.log` writer, `config.json` loader & sliding-window rate limiter
-    │   ├── daemon_client.hpp # Data dir resolution and Unix socket client (`CURLOPT_UNIX_SOCKET_PATH`) to `daemon.sock`
+    │   ├── daemon_client.hpp # Data dir resolution and Unix socket client (`AF_UNIX`) to `daemon.sock`
     │   ├── app.hpp           # `whatsapp::make_whatsapp_app()` registering all 16 tools & Bugsink DSN
     │   ├── oauth_as.hpp      # OAuth 2.1 + PKCE AS & browser QR/approval flow
     │   ├── qr_svg.hpp        # Standalone QR encoder for browser pairing SVG
@@ -62,7 +62,7 @@ plugins/whatsapp-mcp/
 - **`mcp/` (C++26, `slimr-*`):**
   - `<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>` — Typed MCP tool definitions, compile-time JSON Schemas, native MCP `image` & `audio` content blocks, and narrow JSON CLI.
   - `<sqlite.hpp>` (static SQLite with FTS5) — Read-only SQLite connections, custom `wa_utc` scalar function, `TEMP` table/view isolation, and `iterateLimited` (`PRAGMA query_only = ON`).
-  - `<curl.hpp>` (libcurl) — Unix domain socket HTTP calls (`CURLOPT_UNIX_SOCKET_PATH`) to `daemon.sock`.
+  - `<httplib.h>` (`cpp-httplib`) — Unix domain socket HTTP calls (`AF_UNIX`) to `daemon.sock`.
   - `<json.hpp>` (`glaze`) — Fast JSON serialization.
   - `<bugsink.hpp>` — Optional error reporting via `BUGSINK_DSN` (disabled when unset), release `whatsapp-mcp@<VERSION>`.
   - `<test.hpp>` (`doctest`) — Unit test suite compiled with `-fsanitize=address,undefined`.

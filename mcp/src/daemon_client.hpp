@@ -1,13 +1,15 @@
 #pragma once
 
 #include "brew_prefix.hpp"
-#include "curl.hpp"
 #include "json.hpp"
+
+#include <httplib.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <sys/socket.h>
 
 namespace whatsapp {
 
@@ -55,6 +57,19 @@ struct PairQrState {
     std::string error;
 };
 
+namespace detail {
+
+inline httplib::Client make_unix_client(const std::string &sockPath) {
+    httplib::Client cli(sockPath);
+    cli.set_address_family(AF_UNIX);
+    cli.set_connection_timeout(10, 0);
+    cli.set_read_timeout(10, 0);
+    cli.set_write_timeout(10, 0);
+    return cli;
+}
+
+} // namespace detail
+
 inline PairStatus daemon_pair_status(const std::string &sockPath) {
     PairStatus st;
     if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
@@ -62,16 +77,17 @@ inline PairStatus daemon_pair_status(const std::string &sockPath) {
         return st;
     }
     try {
-        slimr::HttpRequest req;
-        req.method = "GET";
-        req.url = "http://localhost/api/pair/status";
-        req.unixSocketPath = sockPath;
-        auto resp = slimr::request(req);
-        if (resp.status != 200) {
-            st.error = "daemon status request failed with HTTP " + std::to_string(resp.status);
+        auto cli = detail::make_unix_client(sockPath);
+        auto res = cli.Get("/api/pair/status");
+        if (!res) {
+            st.error = "daemon status request failed: " + httplib::to_string(res.error());
             return st;
         }
-        auto jRes = slimr::parse_json(resp.body);
+        if (res->status != 200) {
+            st.error = "daemon status request failed with HTTP " + std::to_string(res->status);
+            return st;
+        }
+        auto jRes = slimr::parse_json(res->body);
         if (!jRes || !jRes->is_object()) {
             st.error = "invalid daemon status JSON";
             return st;
@@ -97,16 +113,17 @@ inline PairQrState daemon_pair_qr(const std::string &sockPath) {
         return qr;
     }
     try {
-        slimr::HttpRequest req;
-        req.method = "GET";
-        req.url = "http://localhost/api/pair/qr";
-        req.unixSocketPath = sockPath;
-        auto resp = slimr::request(req);
-        if (resp.status != 200) {
-            qr.error = "daemon QR request failed with HTTP " + std::to_string(resp.status);
+        auto cli = detail::make_unix_client(sockPath);
+        auto res = cli.Get("/api/pair/qr");
+        if (!res) {
+            qr.error = "daemon QR request failed: " + httplib::to_string(res.error());
             return qr;
         }
-        auto jRes = slimr::parse_json(resp.body);
+        if (res->status != 200) {
+            qr.error = "daemon QR request failed with HTTP " + std::to_string(res->status);
+            return qr;
+        }
+        auto jRes = slimr::parse_json(res->body);
         if (!jRes || !jRes->is_object()) {
             qr.error = "invalid daemon QR JSON";
             return qr;
@@ -135,25 +152,16 @@ inline bool daemon_pair_cancel(const std::string &sockPath) {
         return false;
     }
     try {
-        slimr::HttpRequest req;
-        req.method = "POST";
-        req.url = "http://localhost/api/pair/cancel";
-        req.unixSocketPath = sockPath;
-        req.headers["Content-Type"] = "application/json";
-        req.body = "{}";
-        auto resp = slimr::request(req);
-        return resp.status == 200;
+        auto cli = detail::make_unix_client(sockPath);
+        auto res = cli.Post("/api/pair/cancel", "{}", "application/json");
+        return res && res->status == 200;
     } catch (...) {
         return false;
     }
 }
 
 inline SendResult daemon_send(const std::string &sockPath, const std::string &recipient, const std::string &message, const std::string &mediaPath = "") {
-    slimr::HttpRequest req;
-    req.method = "POST";
-    req.url = "http://localhost/api/send";
-    req.unixSocketPath = sockPath;
-    req.headers["Content-Type"] = "application/json";
+    auto cli = detail::make_unix_client(sockPath);
 
     slimr::Json body = slimr::Json::object_t{};
     body["recipient"] = recipient;
@@ -161,14 +169,16 @@ inline SendResult daemon_send(const std::string &sockPath, const std::string &re
         body["message"] = message;
     if (!mediaPath.empty())
         body["media_path"] = mediaPath;
-    req.body = slimr::write_json(body);
 
-    auto resp = slimr::request(req);
-    if (resp.status != 200 && resp.body.empty()) {
-        throw std::runtime_error("daemon request failed with HTTP " + std::to_string(resp.status));
+    auto res = cli.Post("/api/send", slimr::write_json(body), "application/json");
+    if (!res) {
+        throw std::runtime_error("daemon request failed: " + httplib::to_string(res.error()));
+    }
+    if (res->status != 200 && res->body.empty()) {
+        throw std::runtime_error("daemon request failed with HTTP " + std::to_string(res->status));
     }
 
-    auto jRes = slimr::parse_json(resp.body);
+    auto jRes = slimr::parse_json(res->body);
     SendResult r;
     if (jRes) {
         const auto &j = *jRes;
@@ -178,32 +188,30 @@ inline SendResult daemon_send(const std::string &sockPath, const std::string &re
                 r.message = j["message"].get<std::string>();
             }
         } else {
-            r.message = resp.body;
+            r.message = res->body;
         }
     } else {
-        r.message = resp.body;
+        r.message = res->body;
     }
     return r;
 }
 
 inline DownloadedMedia daemon_download(const std::string &sockPath, const std::string &messageId, const std::string &chatJid, const std::string &dataDir) {
-    slimr::HttpRequest req;
-    req.method = "POST";
-    req.url = "http://localhost/api/download";
-    req.unixSocketPath = sockPath;
-    req.headers["Content-Type"] = "application/json";
+    auto cli = detail::make_unix_client(sockPath);
 
     slimr::Json body = slimr::Json::object_t{};
     body["message_id"] = messageId;
     body["chat_jid"] = chatJid;
-    req.body = slimr::write_json(body);
 
-    auto resp = slimr::request(req);
-    if (resp.status != 200 && resp.body.empty()) {
-        throw std::runtime_error("daemon request failed with HTTP " + std::to_string(resp.status));
+    auto res = cli.Post("/api/download", slimr::write_json(body), "application/json");
+    if (!res) {
+        throw std::runtime_error("daemon request failed: " + httplib::to_string(res.error()));
+    }
+    if (res->status != 200 && res->body.empty()) {
+        throw std::runtime_error("daemon request failed with HTTP " + std::to_string(res->status));
     }
 
-    auto jRes = slimr::parse_json(resp.body);
+    auto jRes = slimr::parse_json(res->body);
     if (!jRes) {
         throw std::runtime_error("failed to parse daemon download response JSON: " + jRes.error());
     }
