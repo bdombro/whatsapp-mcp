@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     auto app = whatsapp::make_whatsapp_app();
 
     std::string host = "127.0.0.1";
@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
         if (arg == "--host" && i + 1 < argc) {
             host = argv[++i];
         } else if (arg == "--port" && i + 1 < argc) {
-            char* endPtr = nullptr;
+            char *endPtr = nullptr;
             long parsed = std::strtol(argv[++i], &endPtr, 10);
             if (endPtr != nullptr && *endPtr == '\0' && parsed >= 0 && parsed <= 65535) {
                 port = static_cast<int>(parsed);

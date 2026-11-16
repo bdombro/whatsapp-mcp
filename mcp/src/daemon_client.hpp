@@ -11,13 +11,15 @@
 namespace whatsapp {
 
 inline std::string resolve_data_dir() {
-    const char* clientEnv = std::getenv("WHATSAPP_CLIENT_DATA_DIR");
-    if (clientEnv && clientEnv[0] != '\0') return clientEnv;
+    const char *clientEnv = std::getenv("WHATSAPP_CLIENT_DATA_DIR");
+    if (clientEnv && clientEnv[0] != '\0')
+        return clientEnv;
 
-    const char* mcpEnv = std::getenv("WHATSAPP_MCP_DATA_DIR");
-    if (mcpEnv && mcpEnv[0] != '\0') return mcpEnv;
+    const char *mcpEnv = std::getenv("WHATSAPP_MCP_DATA_DIR");
+    if (mcpEnv && mcpEnv[0] != '\0')
+        return mcpEnv;
 
-    const char* home = std::getenv("HOME");
+    const char *home = std::getenv("HOME");
     std::string homeDir = home ? home : ".";
     std::string clientDir = homeDir + "/.local/share/whatsapp-client";
     std::string mcpDir = homeDir + "/.local/share/whatsapp-mcp";
@@ -31,13 +33,13 @@ inline std::string resolve_data_dir() {
     return clientDir;
 }
 
-inline std::string resolve_socket_path(const std::string& dataDir) {
+inline std::string resolve_socket_path(const std::string &dataDir) {
     std::string sock = dataDir + "/daemon.sock";
     if (std::filesystem::exists(sock)) {
         return sock;
     }
 
-    const char* home = std::getenv("HOME");
+    const char *home = std::getenv("HOME");
     std::string homeDir = home ? home : ".";
     std::string clientSock = homeDir + "/.local/share/whatsapp-client/daemon.sock";
     if (std::filesystem::exists(clientSock)) {
@@ -78,7 +80,7 @@ struct PairQrState {
     std::string error;
 };
 
-inline PairStatus daemon_pair_status(const std::string& sockPath) {
+inline PairStatus daemon_pair_status(const std::string &sockPath) {
     PairStatus st;
     if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
         st.error = "WhatsApp sync daemon is not running (daemon.sock not found)";
@@ -99,7 +101,7 @@ inline PairStatus daemon_pair_status(const std::string& sockPath) {
             st.error = "invalid daemon status JSON";
             return st;
         }
-        const auto& j = *jRes;
+        const auto &j = *jRes;
         st.available = true;
         st.paired = j.contains("paired") && j["paired"].is_boolean() ? j["paired"].get<bool>() : false;
         st.connected = j.contains("connected") && j["connected"].is_boolean() ? j["connected"].get<bool>() : false;
@@ -107,13 +109,13 @@ inline PairStatus daemon_pair_status(const std::string& sockPath) {
             st.jid = j["jid"].get<std::string>();
         }
         return st;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         st.error = e.what();
         return st;
     }
 }
 
-inline PairQrState daemon_pair_qr(const std::string& sockPath) {
+inline PairQrState daemon_pair_qr(const std::string &sockPath) {
     PairQrState qr;
     if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
         qr.error = "WhatsApp sync daemon is not running (daemon.sock not found)";
@@ -134,7 +136,7 @@ inline PairQrState daemon_pair_qr(const std::string& sockPath) {
             qr.error = "invalid daemon QR JSON";
             return qr;
         }
-        const auto& j = *jRes;
+        const auto &j = *jRes;
         qr.available = true;
         qr.paired = j.contains("paired") && j["paired"].is_boolean() ? j["paired"].get<bool>() : false;
         if (j.contains("status") && j["status"].is_string()) {
@@ -147,13 +149,13 @@ inline PairQrState daemon_pair_qr(const std::string& sockPath) {
             qr.expiresInS = static_cast<int>(j["expires_in_s"].get<int64_t>());
         }
         return qr;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         qr.error = e.what();
         return qr;
     }
 }
 
-inline bool daemon_pair_cancel(const std::string& sockPath) {
+inline bool daemon_pair_cancel(const std::string &sockPath) {
     if (sockPath.empty() || !std::filesystem::exists(sockPath)) {
         return false;
     }
@@ -171,7 +173,7 @@ inline bool daemon_pair_cancel(const std::string& sockPath) {
     }
 }
 
-inline SendResult daemon_send(const std::string& sockPath, const std::string& recipient, const std::string& message, const std::string& mediaPath = "") {
+inline SendResult daemon_send(const std::string &sockPath, const std::string &recipient, const std::string &message, const std::string &mediaPath = "") {
     slimr::HttpRequest req;
     req.method = "POST";
     req.url = "http://localhost/api/send";
@@ -180,8 +182,10 @@ inline SendResult daemon_send(const std::string& sockPath, const std::string& re
 
     slimr::Json body = slimr::Json::object_t{};
     body["recipient"] = recipient;
-    if (!message.empty()) body["message"] = message;
-    if (!mediaPath.empty()) body["media_path"] = mediaPath;
+    if (!message.empty())
+        body["message"] = message;
+    if (!mediaPath.empty())
+        body["media_path"] = mediaPath;
     req.body = slimr::write_json(body);
 
     auto resp = slimr::request(req);
@@ -192,7 +196,7 @@ inline SendResult daemon_send(const std::string& sockPath, const std::string& re
     auto jRes = slimr::parse_json(resp.body);
     SendResult r;
     if (jRes) {
-        const auto& j = *jRes;
+        const auto &j = *jRes;
         if (j.is_object() && j.contains("success")) {
             r.success = j["success"].is_boolean() ? j["success"].get<bool>() : false;
             if (j.contains("message") && j["message"].is_string()) {
@@ -207,7 +211,7 @@ inline SendResult daemon_send(const std::string& sockPath, const std::string& re
     return r;
 }
 
-inline DownloadedMedia daemon_download(const std::string& sockPath, const std::string& messageId, const std::string& chatJid, const std::string& dataDir) {
+inline DownloadedMedia daemon_download(const std::string &sockPath, const std::string &messageId, const std::string &chatJid, const std::string &dataDir) {
     slimr::HttpRequest req;
     req.method = "POST";
     req.url = "http://localhost/api/download";
@@ -228,7 +232,7 @@ inline DownloadedMedia daemon_download(const std::string& sockPath, const std::s
     if (!jRes) {
         throw std::runtime_error("failed to parse daemon download response JSON: " + jRes.error());
     }
-    const auto& j = *jRes;
+    const auto &j = *jRes;
     if (!j.is_object() || !j.contains("success") || !j["success"].is_boolean() || !j["success"].get<bool>()) {
         std::string err = "download failed";
         if (j.is_object() && j.contains("message") && j["message"].is_string()) {

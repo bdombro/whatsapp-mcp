@@ -14,13 +14,14 @@
 
 namespace whatsapp {
 
-inline std::mutex& audit_mutex() {
+inline std::mutex &audit_mutex() {
     static std::mutex mu;
     return mu;
 }
 
-inline void log_audit(const std::string& dataDir, const std::string& tool, const slimr::Json& args) {
-    if (dataDir.empty()) return;
+inline void log_audit(const std::string &dataDir, const std::string &tool, const slimr::Json &args) {
+    if (dataDir.empty())
+        return;
     try {
         std::lock_guard<std::mutex> lock(audit_mutex());
         std::filesystem::path dir(dataDir);
@@ -40,11 +41,13 @@ inline void log_audit(const std::string& dataDir, const std::string& tool, const
         summary << "{";
         if (args.is_object()) {
             bool first = true;
-            for (const auto& [k, v] : args.get_object()) {
-                if (!first) summary << ",";
+            for (const auto &[k, v] : args.get_object()) {
+                if (!first)
+                    summary << ",";
                 first = false;
                 std::string lowerK = k;
-                for (char& c : lowerK) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                for (char &c : lowerK)
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
                 if (lowerK == "message" || lowerK == "body" || lowerK == "base64" ||
                     lowerK == "media_path" || lowerK == "path" || lowerK == "query") {
@@ -52,7 +55,8 @@ inline void log_audit(const std::string& dataDir, const std::string& tool, const
                     summary << "\"" << k << "\":\"[redacted len=" << valStr.size() << "]\"";
                 } else {
                     std::string valStr = v.is_string() ? v.get<std::string>() : slimr::write_json(v);
-                    if (valStr.size() > 80) valStr = valStr.substr(0, 80) + "…";
+                    if (valStr.size() > 80)
+                        valStr = valStr.substr(0, 80) + "…";
                     summary << "\"" << k << "\":\"" << valStr << "\"";
                 }
             }

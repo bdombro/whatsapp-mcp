@@ -46,7 +46,8 @@ inline constexpr std::array<EcLSpec, 20> kEcLSpecs = {{
 }};
 
 inline std::vector<int> alignment_positions(int version) {
-    if (version == 1) return {};
+    if (version == 1)
+        return {};
     int numAlign = version / 7 + 2;
     int step = (version == 32) ? 26 : ((version * 4 + numAlign * 2 + 1) / (numAlign * 2 - 2) * 2);
     std::vector<int> result;
@@ -86,7 +87,7 @@ inline std::vector<uint8_t> rs_divisor(int degree) {
     return result;
 }
 
-inline std::vector<uint8_t> rs_remainder(const std::vector<uint8_t>& data, const std::vector<uint8_t>& divisor) {
+inline std::vector<uint8_t> rs_remainder(const std::vector<uint8_t> &data, const std::vector<uint8_t> &divisor) {
     std::vector<uint8_t> result(divisor.size(), 0);
     for (uint8_t b : data) {
         uint8_t factor = b ^ result.front();
@@ -99,14 +100,14 @@ inline std::vector<uint8_t> rs_remainder(const std::vector<uint8_t>& data, const
     return result;
 }
 
-inline void append_bits(std::vector<uint8_t>& out, uint32_t val, int len) {
+inline void append_bits(std::vector<uint8_t> &out, uint32_t val, int len) {
     for (int i = len - 1; i >= 0; --i) {
         out.push_back(static_cast<uint8_t>((val >> i) & 1U));
     }
 }
 
 class QrMatrix {
-public:
+  public:
     explicit QrMatrix(int version)
         : version_(version),
           size_(version * 4 + 17),
@@ -122,7 +123,7 @@ public:
     }
 
     void encodeBytePayload(std::string_view payload) {
-        const auto& spec = kEcLSpecs[static_cast<size_t>(version_ - 1)];
+        const auto &spec = kEcLSpecs[static_cast<size_t>(version_ - 1)];
         const int totalDataBytes = spec.g1Blocks * spec.g1Data + spec.g2Blocks * spec.g2Data;
 
         std::vector<uint8_t> bits;
@@ -200,7 +201,7 @@ public:
         drawFormatBits(bestMask);
     }
 
-private:
+  private:
     void setFunctionModule(int x, int y, bool isDark) {
         size_t idx = static_cast<size_t>(y * size_ + x);
         modules_[idx] = isDark;
@@ -237,19 +238,24 @@ private:
         }
         int bits = ((data << 10) | rem) ^ 0x5412;
 
-        for (int i = 0; i <= 5; ++i) setFunctionModule(8, i, ((bits >> i) & 1) != 0);
+        for (int i = 0; i <= 5; ++i)
+            setFunctionModule(8, i, ((bits >> i) & 1) != 0);
         setFunctionModule(8, 7, ((bits >> 6) & 1) != 0);
         setFunctionModule(8, 8, ((bits >> 7) & 1) != 0);
         setFunctionModule(7, 8, ((bits >> 8) & 1) != 0);
-        for (int i = 9; i < 15; ++i) setFunctionModule(14 - i, 8, ((bits >> i) & 1) != 0);
+        for (int i = 9; i < 15; ++i)
+            setFunctionModule(14 - i, 8, ((bits >> i) & 1) != 0);
 
-        for (int i = 0; i < 8; ++i) setFunctionModule(size_ - 1 - i, 8, ((bits >> i) & 1) != 0);
-        for (int i = 8; i < 15; ++i) setFunctionModule(8, size_ - 15 + i, ((bits >> i) & 1) != 0);
+        for (int i = 0; i < 8; ++i)
+            setFunctionModule(size_ - 1 - i, 8, ((bits >> i) & 1) != 0);
+        for (int i = 8; i < 15; ++i)
+            setFunctionModule(8, size_ - 15 + i, ((bits >> i) & 1) != 0);
         setFunctionModule(8, size_ - 8, true);
     }
 
     void drawVersion() {
-        if (version_ < 7) return;
+        if (version_ < 7)
+            return;
         int rem = version_;
         for (int i = 0; i < 12; ++i) {
             rem = (rem << 1) ^ (((rem >> 11) & 1) * 0x1F25);
@@ -287,11 +293,12 @@ private:
         drawVersion();
     }
 
-    void drawCodewords(const std::vector<uint8_t>& data) {
+    void drawCodewords(const std::vector<uint8_t> &data) {
         size_t i = 0;
         const size_t totalBits = data.size() * 8;
         for (int right = size_ - 1; right >= 1; right -= 2) {
-            if (right == 6) right = 5;
+            if (right == 6)
+                right = 5;
             for (int vert = 0; vert < size_; ++vert) {
                 for (int j = 0; j < 2; ++j) {
                     int x = right - j;
@@ -312,18 +319,36 @@ private:
         for (int y = 0; y < size_; ++y) {
             for (int x = 0; x < size_; ++x) {
                 size_t idx = static_cast<size_t>(y * size_ + x);
-                if (isFunc_[idx]) continue;
+                if (isFunc_[idx])
+                    continue;
                 bool invert = false;
                 switch (mask) {
-                    case 0: invert = (x + y) % 2 == 0; break;
-                    case 1: invert = y % 2 == 0; break;
-                    case 2: invert = x % 3 == 0; break;
-                    case 3: invert = (x + y) % 3 == 0; break;
-                    case 4: invert = (x / 3 + y / 2) % 2 == 0; break;
-                    case 5: invert = (x * y) % 2 + (x * y) % 3 == 0; break;
-                    case 6: invert = ((x * y) % 2 + (x * y) % 3) % 2 == 0; break;
-                    case 7: invert = ((x + y) % 2 + (x * y) % 3) % 2 == 0; break;
-                    default: break;
+                case 0:
+                    invert = (x + y) % 2 == 0;
+                    break;
+                case 1:
+                    invert = y % 2 == 0;
+                    break;
+                case 2:
+                    invert = x % 3 == 0;
+                    break;
+                case 3:
+                    invert = (x + y) % 3 == 0;
+                    break;
+                case 4:
+                    invert = (x / 3 + y / 2) % 2 == 0;
+                    break;
+                case 5:
+                    invert = (x * y) % 2 + (x * y) % 3 == 0;
+                    break;
+                case 6:
+                    invert = ((x * y) % 2 + (x * y) % 3) % 2 == 0;
+                    break;
+                case 7:
+                    invert = ((x + y) % 2 + (x * y) % 3) % 2 == 0;
+                    break;
+                default:
+                    break;
                 }
                 if (invert) {
                     modules_[idx] = !modules_[idx];
@@ -341,14 +366,16 @@ private:
             for (int x = 0; x < size_; ++x) {
                 bool c = get(x, y);
                 if (x == 0 || c != runColor) {
-                    if (runLen >= 5) result += 3 + (runLen - 5);
+                    if (runLen >= 5)
+                        result += 3 + (runLen - 5);
                     runColor = c;
                     runLen = 1;
                 } else {
                     ++runLen;
                 }
             }
-            if (runLen >= 5) result += 3 + (runLen - 5);
+            if (runLen >= 5)
+                result += 3 + (runLen - 5);
         }
         for (int x = 0; x < size_; ++x) {
             bool runColor = false;
@@ -356,14 +383,16 @@ private:
             for (int y = 0; y < size_; ++y) {
                 bool c = get(x, y);
                 if (y == 0 || c != runColor) {
-                    if (runLen >= 5) result += 3 + (runLen - 5);
+                    if (runLen >= 5)
+                        result += 3 + (runLen - 5);
                     runColor = c;
                     runLen = 1;
                 } else {
                     ++runLen;
                 }
             }
-            if (runLen >= 5) result += 3 + (runLen - 5);
+            if (runLen >= 5)
+                result += 3 + (runLen - 5);
         }
         // Rule 2: 2x2 blocks
         for (int y = 0; y < size_ - 1; ++y) {
@@ -375,7 +404,7 @@ private:
             }
         }
         // Rule 3: finder-like 1:1:3:1:1 patterns
-        auto hasFinderLike = [](const std::vector<bool>& line) -> long long {
+        auto hasFinderLike = [](const std::vector<bool> &line) -> long long {
             long long hits = 0;
             const int n = static_cast<int>(line.size());
             for (int i = 0; i + 11 <= n; ++i) {
@@ -391,23 +420,27 @@ private:
                           line[static_cast<size_t>(i + 6)] && line[static_cast<size_t>(i + 7)] &&
                           line[static_cast<size_t>(i + 8)] && !line[static_cast<size_t>(i + 9)] &&
                           line[static_cast<size_t>(i + 10)];
-                if (p1 || p2) hits += 40;
+                if (p1 || p2)
+                    hits += 40;
             }
             return hits;
         };
         std::vector<bool> line(static_cast<size_t>(size_));
         for (int y = 0; y < size_; ++y) {
-            for (int x = 0; x < size_; ++x) line[static_cast<size_t>(x)] = get(x, y);
+            for (int x = 0; x < size_; ++x)
+                line[static_cast<size_t>(x)] = get(x, y);
             result += hasFinderLike(line);
         }
         for (int x = 0; x < size_; ++x) {
-            for (int y = 0; y < size_; ++y) line[static_cast<size_t>(y)] = get(x, y);
+            for (int y = 0; y < size_; ++y)
+                line[static_cast<size_t>(y)] = get(x, y);
             result += hasFinderLike(line);
         }
         // Rule 4: dark proportion
         long long dark = 0;
         for (bool m : modules_) {
-            if (m) ++dark;
+            if (m)
+                ++dark;
         }
         long long total = static_cast<long long>(size_) * size_;
         long long k = std::abs(dark * 20 - total * 10) / total;
@@ -423,7 +456,7 @@ private:
 
 inline int select_qr_version(size_t byteLen) {
     for (int v = 1; v <= 20; ++v) {
-        const auto& spec = kEcLSpecs[static_cast<size_t>(v - 1)];
+        const auto &spec = kEcLSpecs[static_cast<size_t>(v - 1)];
         const int dataBytes = spec.g1Blocks * spec.g1Data + spec.g2Blocks * spec.g2Data;
         const int headerBits = 4 + ((v <= 9) ? 8 : 16);
         const size_t availBytes = (static_cast<size_t>(dataBytes) * 8 - static_cast<size_t>(headerBits)) / 8;

@@ -13,9 +13,12 @@ namespace whatsapp {
 /// Normalizes mixed-offset timestamp strings to "YYYY-MM-DD HH:MM:SS" UTC.
 /// Supports Go time.String() ("2026-11-08 00:40:38 +0100 IST"), RFC3339, SQLite datetime, and YYYY-MM-DD.
 inline std::optional<std::string> wa_utc_normalize(std::string_view sv) {
-    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.front()))) sv.remove_prefix(1);
-    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.back()))) sv.remove_suffix(1);
-    if (sv.size() < 10) return std::nullopt;
+    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.front())))
+        sv.remove_prefix(1);
+    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.back())))
+        sv.remove_suffix(1);
+    if (sv.size() < 10)
+        return std::nullopt;
 
     int year = 0, month = 0, day = 0;
     int hour = 0, min = 0, sec = 0;
@@ -96,9 +99,12 @@ inline std::optional<std::string> wa_utc_normalize(std::string_view sv) {
 /// Parses date bounds for export: accepts YYYY-MM-DD (local time) or RFC3339.
 /// For until with YYYY-MM-DD (end=true), includes the whole day by adding 1 day.
 inline std::string parse_date_bound(std::string_view s, bool end) {
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.remove_prefix(1);
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.remove_suffix(1);
-    if (s.empty()) return "";
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front())))
+        s.remove_prefix(1);
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())))
+        s.remove_suffix(1);
+    if (s.empty())
+        return "";
 
     // Check for bare YYYY-MM-DD
     if (s.size() == 10 && s[4] == '-' && s[7] == '-') {

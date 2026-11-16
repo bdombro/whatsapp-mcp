@@ -31,7 +31,7 @@ namespace whatsapp {
 
 namespace oauth_detail {
 
-inline std::string b64url_encode(const uint8_t* data, size_t len) {
+inline std::string b64url_encode(const uint8_t *data, size_t len) {
     static constexpr char kTbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::string out;
     out.reserve(((len + 2) / 3) * 4);
@@ -52,7 +52,7 @@ inline std::string b64url_encode(const uint8_t* data, size_t len) {
 }
 
 inline std::string b64url_encode_str(std::string_view s) {
-    return b64url_encode(reinterpret_cast<const uint8_t*>(s.data()), s.size());
+    return b64url_encode(reinterpret_cast<const uint8_t *>(s.data()), s.size());
 }
 
 inline std::string random_token(size_t numBytes = 32) {
@@ -89,28 +89,32 @@ inline bool constant_time_eq(std::string_view a, std::string_view b) {
 }
 
 inline bool is_valid_pkce_verifier(std::string_view v) noexcept {
-    if (v.size() < 43 || v.size() > 128) return false;
+    if (v.size() < 43 || v.size() > 128)
+        return false;
     for (unsigned char c : v) {
         bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
                   c == '-' || c == '.' || c == '_' || c == '~';
-        if (!ok) return false;
+        if (!ok)
+            return false;
     }
     return true;
 }
 
 inline bool is_valid_b64url_challenge(std::string_view c) noexcept {
-    if (c.size() != 43) return false;
+    if (c.size() != 43)
+        return false;
     for (unsigned char ch : c) {
         bool ok = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
                   ch == '-' || ch == '_';
-        if (!ok) return false;
+        if (!ok)
+            return false;
     }
     return true;
 }
 
 inline std::string ascii_lower(std::string_view s) {
     std::string out(s);
-    for (char& ch : out) {
+    for (char &ch : out) {
         ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
     }
     return out;
@@ -118,7 +122,8 @@ inline std::string ascii_lower(std::string_view s) {
 
 inline bool has_control_chars(std::string_view s) noexcept {
     for (unsigned char c : s) {
-        if (c < 0x20 || c == 0x7F) return true;
+        if (c < 0x20 || c == 0x7F)
+            return true;
     }
     return false;
 }
@@ -128,12 +133,24 @@ inline std::string html_escape(std::string_view s) {
     out.reserve(s.size());
     for (char c : s) {
         switch (c) {
-            case '&': out += "&amp;"; break;
-            case '<': out += "&lt;"; break;
-            case '>': out += "&gt;"; break;
-            case '"': out += "&quot;"; break;
-            case '\'': out += "&#39;"; break;
-            default: out.push_back(c); break;
+        case '&':
+            out += "&amp;";
+            break;
+        case '<':
+            out += "&lt;";
+            break;
+        case '>':
+            out += "&gt;";
+            break;
+        case '"':
+            out += "&quot;";
+            break;
+        case '\'':
+            out += "&#39;";
+            break;
+        default:
+            out.push_back(c);
+            break;
         }
     }
     return out;
@@ -159,9 +176,12 @@ inline std::string url_encode(std::string_view s) {
 
 inline std::string url_decode(std::string_view s) {
     auto hexVal = [](char c) -> int {
-        if (c >= '0' && c <= '9') return c - '0';
-        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
         return -1;
     };
     std::string res;
@@ -199,7 +219,8 @@ inline std::map<std::string, std::string> parse_form_urlencoded(std::string_view
                 out[url_decode(pair.substr(0, eq))] = url_decode(pair.substr(eq + 1));
             }
         }
-        if (amp == std::string_view::npos) break;
+        if (amp == std::string_view::npos)
+            break;
         pos = amp + 1;
     }
     return out;
@@ -210,47 +231,59 @@ inline std::optional<std::string> extract_cookie_value(std::string_view cookieHe
     while (pos < cookieHeader.size()) {
         auto semi = cookieHeader.find(';', pos);
         std::string_view item = (semi == std::string_view::npos)
-            ? cookieHeader.substr(pos)
-            : cookieHeader.substr(pos, semi - pos);
-        while (!item.empty() && (item.front() == ' ' || item.front() == '\t')) item.remove_prefix(1);
-        while (!item.empty() && (item.back() == ' ' || item.back() == '\t')) item.remove_suffix(1);
+                                    ? cookieHeader.substr(pos)
+                                    : cookieHeader.substr(pos, semi - pos);
+        while (!item.empty() && (item.front() == ' ' || item.front() == '\t'))
+            item.remove_prefix(1);
+        while (!item.empty() && (item.back() == ' ' || item.back() == '\t'))
+            item.remove_suffix(1);
         auto eq = item.find('=');
         if (eq != std::string_view::npos && item.substr(0, eq) == name) {
             return std::string(item.substr(eq + 1));
         }
-        if (semi == std::string_view::npos) break;
+        if (semi == std::string_view::npos)
+            break;
         pos = semi + 1;
     }
     return std::nullopt;
 }
 
 inline bool is_valid_loopback_redirect_uri(std::string_view uri) noexcept {
-    if (uri.empty() || uri.size() > 2048 || has_control_chars(uri)) return false;
-    if (uri.find('#') != std::string_view::npos || uri.find('@') != std::string_view::npos) return false;
+    if (uri.empty() || uri.size() > 2048 || has_control_chars(uri))
+        return false;
+    if (uri.find('#') != std::string_view::npos || uri.find('@') != std::string_view::npos)
+        return false;
     for (unsigned char c : uri) {
-        if (c == ' ' || c == '\t') return false;
+        if (c == ' ' || c == '\t')
+            return false;
     }
 
     auto schemeEnd = uri.find("://");
-    if (schemeEnd == std::string_view::npos) return false;
-    if (ascii_lower(uri.substr(0, schemeEnd)) != "http") return false;
+    if (schemeEnd == std::string_view::npos)
+        return false;
+    if (ascii_lower(uri.substr(0, schemeEnd)) != "http")
+        return false;
 
     std::string_view rest = uri.substr(schemeEnd + 3);
     auto pathPos = rest.find_first_of("/?");
     std::string_view authority = (pathPos == std::string_view::npos) ? rest : rest.substr(0, pathPos);
-    if (authority.empty()) return false;
+    if (authority.empty())
+        return false;
 
     std::string_view host;
     std::string_view portStr;
     if (authority.front() == '[') {
         auto closeBracket = authority.find(']');
-        if (closeBracket == std::string_view::npos) return false;
+        if (closeBracket == std::string_view::npos)
+            return false;
         host = authority.substr(0, closeBracket + 1);
         std::string_view after = authority.substr(closeBracket + 1);
         if (!after.empty()) {
-            if (after.front() != ':') return false;
+            if (after.front() != ':')
+                return false;
             portStr = after.substr(1);
-            if (portStr.empty()) return false;
+            if (portStr.empty())
+                return false;
         }
     } else {
         auto colon = authority.find(':');
@@ -259,7 +292,8 @@ inline bool is_valid_loopback_redirect_uri(std::string_view uri) noexcept {
         } else {
             host = authority.substr(0, colon);
             portStr = authority.substr(colon + 1);
-            if (portStr.empty()) return false;
+            if (portStr.empty())
+                return false;
         }
     }
 
@@ -268,13 +302,16 @@ inline bool is_valid_loopback_redirect_uri(std::string_view uri) noexcept {
         return false;
     }
     if (!portStr.empty()) {
-        if (portStr.size() > 5) return false;
+        if (portStr.size() > 5)
+            return false;
         unsigned long portVal = 0;
         for (char c : portStr) {
-            if (c < '0' || c > '9') return false;
+            if (c < '0' || c > '9')
+                return false;
             portVal = portVal * 10 + static_cast<unsigned long>(c - '0');
         }
-        if (portVal < 1 || portVal > 65535) return false;
+        if (portVal < 1 || portVal > 65535)
+            return false;
     }
     return true;
 }
@@ -283,8 +320,9 @@ inline std::string append_redirect_params(std::string_view baseUri,
                                           std::initializer_list<std::pair<std::string_view, std::string_view>> params) {
     std::string out(baseUri);
     bool hasQuery = (baseUri.find('?') != std::string_view::npos);
-    for (const auto& [k, v] : params) {
-        if (v.empty()) continue;
+    for (const auto &[k, v] : params) {
+        if (v.empty())
+            continue;
         out.push_back(hasQuery ? '&' : '?');
         hasQuery = true;
         out += url_encode(k);
@@ -298,10 +336,13 @@ inline std::vector<std::string> parse_scopes(std::string_view raw) {
     std::vector<std::string> out;
     size_t i = 0;
     while (i < raw.size()) {
-        while (i < raw.size() && raw[i] == ' ') ++i;
-        if (i >= raw.size()) break;
+        while (i < raw.size() && raw[i] == ' ')
+            ++i;
+        if (i >= raw.size())
+            break;
         size_t j = i;
-        while (j < raw.size() && raw[j] != ' ') ++j;
+        while (j < raw.size() && raw[j] != ' ')
+            ++j;
         std::string tok(raw.substr(i, j - i));
         if (std::find(out.begin(), out.end(), tok) == out.end()) {
             out.push_back(std::move(tok));
@@ -315,16 +356,17 @@ inline bool is_supported_scope(std::string_view s) noexcept {
     return s == "whatsapp:read" || s == "whatsapp:write";
 }
 
-inline std::string join_scopes(const std::vector<std::string>& scopes) {
+inline std::string join_scopes(const std::vector<std::string> &scopes) {
     std::string out;
     for (size_t i = 0; i < scopes.size(); ++i) {
-        if (i > 0) out.push_back(' ');
+        if (i > 0)
+            out.push_back(' ');
         out += scopes[i];
     }
     return out;
 }
 
-inline std::string derive_base_url_from_request(const slimr::HttpRouteRequest& req, std::string_view fallback) {
+inline std::string derive_base_url_from_request(const slimr::HttpRouteRequest &req, std::string_view fallback) {
     auto hostHdr = req.header("host");
     if (hostHdr.has_value() && !hostHdr->empty() && !has_control_chars(*hostHdr)) {
         bool validChars = true;
@@ -352,7 +394,7 @@ inline std::string derive_base_url_from_resource(std::string_view resourceUrl,
     return std::string(fallback);
 }
 
-inline void add_security_headers(slimr::HttpRouteResponse& resp, std::string_view csp) {
+inline void add_security_headers(slimr::HttpRouteResponse &resp, std::string_view csp) {
     resp.headers["Cache-Control"] = "no-store";
     resp.headers["Pragma"] = "no-cache";
     resp.headers["X-Frame-Options"] = "DENY";
@@ -377,10 +419,10 @@ struct OAuthAsConfig {
 };
 
 class OAuthAsServer {
-public:
+  public:
     explicit OAuthAsServer(OAuthAsConfig cfg) : cfg_(std::move(cfg)) {}
 
-    slimr::TokenValidationResult validateBearerToken(const slimr::TokenValidationContext& tctx) {
+    slimr::TokenValidationResult validateBearerToken(const slimr::TokenValidationContext &tctx) {
         using Status = slimr::TokenValidationResult::Status;
         slimr::TokenValidationResult res;
         res.status = Status::InvalidToken;
@@ -401,7 +443,7 @@ public:
         purgeExpiredLocked(now);
 
         std::optional<AccessTokenRecord> matched;
-        for (const auto& [storedKey, rec] : accessTokens_) {
+        for (const auto &[storedKey, rec] : accessTokens_) {
             (void)storedKey;
             if (CRYPTO_memcmp(rec.tokenHash.data(), tokenDigest.data(), tokenDigest.size()) == 0) {
                 matched = rec;
@@ -444,70 +486,61 @@ public:
                 .method = "GET",
                 .path = "/.well-known/oauth-protected-resource",
                 .enforceSameOrigin = true,
-                .handler = [this](const slimr::HttpRouteRequest& req) { return handleProtectedResourceMetadata(req); }
-            });
+                .handler = [this](const slimr::HttpRouteRequest &req) { return handleProtectedResourceMetadata(req); }});
         }
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "GET",
             .path = "/.well-known/oauth-authorization-server",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleMetadata(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleMetadata(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "POST",
             .path = "/register",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleRegister(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleRegister(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "GET",
             .path = "/authorize",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleAuthorizeGet(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleAuthorizeGet(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "GET",
             .path = "/authorize/qr",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleAuthorizeQr(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleAuthorizeQr(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "POST",
             .path = "/authorize/approve",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleAuthorizeApprove(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleAuthorizeApprove(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "POST",
             .path = "/authorize/cancel",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleAuthorizeCancel(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleAuthorizeCancel(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "POST",
             .path = "/token",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleToken(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleToken(req); }});
 
         out.push_back(slimr::CustomHttpRoute{
             .method = "POST",
             .path = "/revoke",
             .enforceSameOrigin = true,
-            .handler = [this](const slimr::HttpRouteRequest& req) { return handleRevoke(req); }
-        });
+            .handler = [this](const slimr::HttpRouteRequest &req) { return handleRevoke(req); }});
 
         return out;
     }
 
-private:
+  private:
     struct ClientRecord {
         std::string clientId;
         std::string clientName;
@@ -574,14 +607,14 @@ private:
     static constexpr size_t kMaxTokens = 1024;
 
     void purgeExpiredLocked(std::chrono::system_clock::time_point now) {
-        std::erase_if(clients_, [&](const auto& kv) { return kv.second.expiresAt <= now; });
-        std::erase_if(authTxs_, [&](const auto& kv) { return kv.second.expiresAt <= now; });
-        std::erase_if(authCodes_, [&](const auto& kv) { return kv.second.expiresAt <= now; });
-        std::erase_if(accessTokens_, [&](const auto& kv) { return kv.second.revoked || kv.second.expiresAt <= now; });
-        std::erase_if(refreshTokens_, [&](const auto& kv) { return kv.second.revoked || kv.second.expiresAt <= now; });
+        std::erase_if(clients_, [&](const auto &kv) { return kv.second.expiresAt <= now; });
+        std::erase_if(authTxs_, [&](const auto &kv) { return kv.second.expiresAt <= now; });
+        std::erase_if(authCodes_, [&](const auto &kv) { return kv.second.expiresAt <= now; });
+        std::erase_if(accessTokens_, [&](const auto &kv) { return kv.second.revoked || kv.second.expiresAt <= now; });
+        std::erase_if(refreshTokens_, [&](const auto &kv) { return kv.second.revoked || kv.second.expiresAt <= now; });
     }
 
-    slimr::HttpRouteResponse handleProtectedResourceMetadata(const slimr::HttpRouteRequest& req) const {
+    slimr::HttpRouteResponse handleProtectedResourceMetadata(const slimr::HttpRouteRequest &req) const {
         std::string base = oauth_detail::derive_base_url_from_request(req, cfg_.defaultBaseUrl);
         slimr::OAuthResourceMetadata md;
         md.resourceName = "WhatsApp MCP";
@@ -592,7 +625,7 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleMetadata(const slimr::HttpRouteRequest& req) const {
+    slimr::HttpRouteResponse handleMetadata(const slimr::HttpRouteRequest &req) const {
         std::string base = oauth_detail::derive_base_url_from_request(req, cfg_.defaultBaseUrl);
         slimr::Json j = slimr::json_obj();
         j["issuer"] = base;
@@ -622,33 +655,35 @@ private:
     static slimr::HttpRouteResponse htmlError(int status, std::string_view title, std::string_view detail) {
         std::string body = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                           "<title>" + oauth_detail::html_escape(title) + "</title>"
-                           "<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:520px;margin:48px auto;padding:0 20px;color:#111;background:#fafafa}"
-                           ".card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.04)}"
-                           "h1{font-size:18px;margin:0 0 10px}p{color:#4b5563;line-height:1.5;margin:0}</style>"
-                           "</head><body><div class=\"card\"><h1>" + oauth_detail::html_escape(title) +
+                           "<title>" +
+                           oauth_detail::html_escape(title) + "</title>"
+                                                              "<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:520px;margin:48px auto;padding:0 20px;color:#111;background:#fafafa}"
+                                                              ".card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.04)}"
+                                                              "h1{font-size:18px;margin:0 0 10px}p{color:#4b5563;line-height:1.5;margin:0}</style>"
+                                                              "</head><body><div class=\"card\"><h1>" +
+                           oauth_detail::html_escape(title) +
                            "</h1><p>" + oauth_detail::html_escape(detail) + "</p></div></body></html>";
         auto resp = slimr::HttpRouteResponse::html(status, std::move(body));
         oauth_detail::add_security_headers(resp, "default-src 'none'; style-src 'unsafe-inline'");
         return resp;
     }
 
-    slimr::HttpRouteResponse handleRegister(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleRegister(const slimr::HttpRouteRequest &req) {
         auto parsed = slimr::parse_json(req.body);
         if (!parsed || !parsed->is_object()) {
             return jsonError(400, "invalid_client_metadata", "Expected JSON object body");
         }
-        const auto& j = *parsed;
+        const auto &j = *parsed;
         if (!j.contains("redirect_uris") || !j["redirect_uris"].is_array() || j["redirect_uris"].get_array().empty()) {
             return jsonError(400, "invalid_redirect_uri", "redirect_uris must be a non-empty array");
         }
 
         std::vector<std::string> redirectUris;
-        for (const auto& item : j["redirect_uris"].get_array()) {
+        for (const auto &item : j["redirect_uris"].get_array()) {
             if (!item.is_string()) {
                 return jsonError(400, "invalid_redirect_uri", "redirect_uris entries must be strings");
             }
-            const std::string& uri = item.get<std::string>();
+            const std::string &uri = item.get<std::string>();
             if (!oauth_detail::is_valid_loopback_redirect_uri(uri)) {
                 return jsonError(400, "invalid_redirect_uri", "Only loopback HTTP redirect_uris are allowed");
             }
@@ -669,7 +704,7 @@ private:
             if (reqScopes.empty()) {
                 return jsonError(400, "invalid_scope", "Empty scope");
             }
-            for (const auto& s : reqScopes) {
+            for (const auto &s : reqScopes) {
                 if (!oauth_detail::is_supported_scope(s)) {
                     return jsonError(400, "invalid_scope", "Unsupported scope: " + s);
                 }
@@ -699,7 +734,8 @@ private:
         out["client_id"] = clientId;
         out["client_name"] = clientName;
         slimr::Json::array_t uriArr;
-        for (const auto& u : redirectUris) uriArr.emplace_back(u);
+        for (const auto &u : redirectUris)
+            uriArr.emplace_back(u);
         out["redirect_uris"] = slimr::json_arr(std::move(uriArr));
         out["grant_types"] = slimr::Json::array_t{"authorization_code", "refresh_token"};
         out["response_types"] = slimr::Json::array_t{"code"};
@@ -711,7 +747,7 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleAuthorizeGet(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleAuthorizeGet(const slimr::HttpRouteRequest &req) {
         std::string clientId = req.query("client_id").value_or("");
         std::string redirectUri = req.query("redirect_uri").value_or("");
         std::string responseType = req.query("response_type").value_or("");
@@ -764,7 +800,7 @@ private:
             if (parsedScopes.empty()) {
                 return htmlError(400, "Invalid Scope", "Requested scope is empty.");
             }
-            for (const auto& s : parsedScopes) {
+            for (const auto &s : parsedScopes) {
                 if (!oauth_detail::is_supported_scope(s)) {
                     return htmlError(400, "Invalid Scope", "Unsupported scope requested.");
                 }
@@ -904,7 +940,7 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleAuthorizeQr(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleAuthorizeQr(const slimr::HttpRouteRequest &req) {
         std::string txId = req.query("tx").value_or("");
         if (txId.empty()) {
             return jsonError(400, "invalid_request", "Missing tx parameter");
@@ -966,14 +1002,15 @@ private:
         return resp;
     }
 
-    static std::map<std::string, std::string> parseRequestParams(const slimr::HttpRouteRequest& req) {
+    static std::map<std::string, std::string> parseRequestParams(const slimr::HttpRouteRequest &req) {
         auto ct = req.header("content-type").value_or("");
         if (oauth_detail::ascii_lower(ct).find("application/json") != std::string::npos) {
             std::map<std::string, std::string> out;
             auto parsed = slimr::parse_json(req.body);
             if (parsed && parsed->is_object()) {
-                for (const auto& [k, v] : parsed->get_object()) {
-                    if (v.is_string()) out[k] = v.get<std::string>();
+                for (const auto &[k, v] : parsed->get_object()) {
+                    if (v.is_string())
+                        out[k] = v.get<std::string>();
                 }
             }
             return out;
@@ -981,11 +1018,11 @@ private:
         return oauth_detail::parse_form_urlencoded(req.body);
     }
 
-    slimr::HttpRouteResponse handleAuthorizeApprove(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleAuthorizeApprove(const slimr::HttpRouteRequest &req) {
         auto params = parseRequestParams(req);
-        const std::string& txId = params["tx"];
-        const std::string& csrf = params["csrf"];
-        const std::string& action = params["action"];
+        const std::string &txId = params["tx"];
+        const std::string &csrf = params["csrf"];
+        const std::string &action = params["action"];
 
         if (txId.empty() || csrf.empty()) {
             return htmlError(400, "Invalid Request", "Missing authorization transaction or CSRF token.");
@@ -1067,10 +1104,10 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleAuthorizeCancel(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleAuthorizeCancel(const slimr::HttpRouteRequest &req) {
         auto params = parseRequestParams(req);
-        const std::string& txId = params["tx"];
-        const std::string& csrf = params["csrf"];
+        const std::string &txId = params["tx"];
+        const std::string &csrf = params["csrf"];
         if (txId.empty() || csrf.empty()) {
             return htmlError(400, "Invalid Request", "Missing transaction or CSRF token.");
         }
@@ -1101,17 +1138,17 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleToken(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleToken(const slimr::HttpRouteRequest &req) {
         auto params = parseRequestParams(req);
-        const std::string& grantType = params["grant_type"];
+        const std::string &grantType = params["grant_type"];
         const auto now = std::chrono::system_clock::now();
 
         if (grantType == "authorization_code") {
-            const std::string& code = params["code"];
-            const std::string& codeVerifier = params["code_verifier"];
-            const std::string& clientId = params["client_id"];
-            const std::string& redirectUri = params["redirect_uri"];
-            const std::string& resource = params["resource"];
+            const std::string &code = params["code"];
+            const std::string &codeVerifier = params["code_verifier"];
+            const std::string &clientId = params["client_id"];
+            const std::string &redirectUri = params["redirect_uri"];
+            const std::string &resource = params["resource"];
 
             if (code.empty() || codeVerifier.empty() || clientId.empty() || redirectUri.empty()) {
                 return jsonError(400, "invalid_request", "Missing required token parameters");
@@ -1151,9 +1188,9 @@ private:
         }
 
         if (grantType == "refresh_token") {
-            const std::string& rawRefresh = params["refresh_token"];
-            const std::string& clientId = params["client_id"];
-            const std::string& resource = params["resource"];
+            const std::string &rawRefresh = params["refresh_token"];
+            const std::string &clientId = params["client_id"];
+            const std::string &resource = params["resource"];
             if (rawRefresh.empty() || clientId.empty()) {
                 return jsonError(400, "invalid_request", "Missing refresh_token or client_id");
             }
@@ -1164,17 +1201,19 @@ private:
             {
                 std::lock_guard<std::mutex> lk(mu_);
                 purgeExpiredLocked(now);
-                for (auto& [k, v] : refreshTokens_) {
+                for (auto &[k, v] : refreshTokens_) {
                     if (CRYPTO_memcmp(v.tokenHash.data(), refreshDigest.data(), refreshDigest.size()) == 0) {
                         matchedKey = k;
                         rec = v;
                         if (v.used || v.revoked) {
                             // Refresh token replay detected: revoke entire grant family.
-                            for (auto& [ak, av] : accessTokens_) {
-                                if (av.grantId == v.grantId) av.revoked = true;
+                            for (auto &[ak, av] : accessTokens_) {
+                                if (av.grantId == v.grantId)
+                                    av.revoked = true;
                             }
-                            for (auto& [rk, rv] : refreshTokens_) {
-                                if (rv.grantId == v.grantId) rv.revoked = true;
+                            for (auto &[rk, rv] : refreshTokens_) {
+                                if (rv.grantId == v.grantId)
+                                    rv.revoked = true;
                             }
                             return jsonError(400, "invalid_grant", "Refresh token has been revoked or replayed");
                         }
@@ -1200,11 +1239,11 @@ private:
         return jsonError(400, "unsupported_grant_type", "Supported grant types: authorization_code, refresh_token");
     }
 
-    slimr::HttpRouteResponse issueTokens(const std::string& clientId,
-                                         const std::string& issuer,
-                                         const std::string& audience,
-                                         const std::string& subject,
-                                         const std::vector<std::string>& scopes,
+    slimr::HttpRouteResponse issueTokens(const std::string &clientId,
+                                         const std::string &issuer,
+                                         const std::string &audience,
+                                         const std::string &subject,
+                                         const std::vector<std::string> &scopes,
                                          std::string grantId,
                                          std::chrono::system_clock::time_point now) {
         if (grantId.empty()) {
@@ -1260,24 +1299,25 @@ private:
         return resp;
     }
 
-    slimr::HttpRouteResponse handleRevoke(const slimr::HttpRouteRequest& req) {
+    slimr::HttpRouteResponse handleRevoke(const slimr::HttpRouteRequest &req) {
         auto params = parseRequestParams(req);
-        const std::string& token = params["token"];
+        const std::string &token = params["token"];
         if (!token.empty()) {
             auto digest = oauth_detail::sha256_digest(token);
             std::lock_guard<std::mutex> lk(mu_);
-            for (auto& [k, v] : accessTokens_) {
+            for (auto &[k, v] : accessTokens_) {
                 (void)k;
                 if (CRYPTO_memcmp(v.tokenHash.data(), digest.data(), digest.size()) == 0) {
                     v.revoked = true;
                 }
             }
-            for (auto& [k, v] : refreshTokens_) {
+            for (auto &[k, v] : refreshTokens_) {
                 (void)k;
                 if (CRYPTO_memcmp(v.tokenHash.data(), digest.data(), digest.size()) == 0) {
                     v.revoked = true;
-                    for (auto& [ak, av] : accessTokens_) {
-                        if (av.grantId == v.grantId) av.revoked = true;
+                    for (auto &[ak, av] : accessTokens_) {
+                        if (av.grantId == v.grantId)
+                            av.revoked = true;
                     }
                 }
             }
@@ -1297,7 +1337,7 @@ private:
     std::map<std::string, RefreshTokenRecord> refreshTokens_;
 };
 
-inline std::shared_ptr<OAuthAsServer> configure_whatsapp_http_oauth(slimr::HttpServerOptions& httpOpts,
+inline std::shared_ptr<OAuthAsServer> configure_whatsapp_http_oauth(slimr::HttpServerOptions &httpOpts,
                                                                     OAuthAsConfig asCfg,
                                                                     bool isFixedPort) {
     auto oauthServer = std::make_shared<OAuthAsServer>(asCfg);
@@ -1314,11 +1354,11 @@ inline std::shared_ptr<OAuthAsServer> configure_whatsapp_http_oauth(slimr::HttpS
         // On ephemeral port (--port 0), validateToken checks exact issuer derived from tctx.expectedResource.
         httpOpts.oauth.expectedIssuers.clear();
     }
-    httpOpts.oauth.validateToken = [oauthServer](const slimr::TokenValidationContext& tctx) {
+    httpOpts.oauth.validateToken = [oauthServer](const slimr::TokenValidationContext &tctx) {
         return oauthServer->validateBearerToken(tctx);
     };
 
-    for (auto& r : oauthServer->routes(/*includeProtectedResourceMetadata=*/!isFixedPort)) {
+    for (auto &r : oauthServer->routes(/*includeProtectedResourceMetadata=*/!isFixedPort)) {
         httpOpts.customRoutes.push_back(std::move(r));
     }
     return oauthServer;

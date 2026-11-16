@@ -25,11 +25,11 @@
 
 namespace whatsapp {
 
-inline std::mutex& db_mutex_for(const std::string& path) {
+inline std::mutex &db_mutex_for(const std::string &path) {
     static std::mutex registryMu;
     static std::map<std::string, std::unique_ptr<std::mutex>> registry;
     std::lock_guard<std::mutex> lk(registryMu);
-    auto& ptr = registry[path];
+    auto &ptr = registry[path];
     if (!ptr) {
         ptr = std::make_unique<std::mutex>();
     }
@@ -57,20 +57,27 @@ inline std::string base64_url_encode(std::string_view input) {
 
 inline std::optional<std::string> base64_url_decode(std::string_view input) {
     auto decode_char = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '-' || c == '+') return 62;
-        if (c == '_' || c == '/') return 63;
+        if (c >= 'A' && c <= 'Z')
+            return c - 'A';
+        if (c >= 'a' && c <= 'z')
+            return c - 'a' + 26;
+        if (c >= '0' && c <= '9')
+            return c - '0' + 52;
+        if (c == '-' || c == '+')
+            return 62;
+        if (c == '_' || c == '/')
+            return 63;
         return -1;
     };
     std::string out;
     int val = 0;
     int valb = -8;
     for (char c : input) {
-        if (c == '=') break;
+        if (c == '=')
+            break;
         int d = decode_char(c);
-        if (d == -1) return std::nullopt;
+        if (d == -1)
+            return std::nullopt;
         val = (val << 6) + d;
         valb += 6;
         if (valb >= 0) {
@@ -82,17 +89,21 @@ inline std::optional<std::string> base64_url_decode(std::string_view input) {
 }
 
 template <typename T>
-inline T json_val(const slimr::Json& j, std::string_view key, T def = {}) {
-    if (!j.is_object() || !j.contains(key)) return def;
-    const auto& v = j[key];
+inline T json_val(const slimr::Json &j, std::string_view key, T def = {}) {
+    if (!j.is_object() || !j.contains(key))
+        return def;
+    const auto &v = j[key];
     if constexpr (std::is_same_v<T, std::string>) {
         return v.is_string() ? v.get<std::string>() : def;
     } else if constexpr (std::is_integral_v<T>) {
-        if (v.is_number()) return static_cast<T>(v.get<int64_t>());
+        if (v.is_number())
+            return static_cast<T>(v.get<int64_t>());
         return def;
     } else if constexpr (std::is_same_v<T, bool>) {
-        if (v.is_boolean()) return v.get<bool>();
-        if (v.is_number()) return v.get<int64_t>() != 0;
+        if (v.is_boolean())
+            return v.get<bool>();
+        if (v.is_number())
+            return v.get<int64_t>() != 0;
         return def;
     } else {
         return def;
@@ -109,7 +120,7 @@ struct ExportCursor {
     std::string id() const { return i; }
 };
 
-inline std::string encode_export_cursor(const std::string& chatJid, const std::string& timeUtc, const std::string& id) {
+inline std::string encode_export_cursor(const std::string &chatJid, const std::string &timeUtc, const std::string &id) {
     slimr::Json j = slimr::Json::object_t{};
     j["c"] = chatJid;
     j["t"] = timeUtc;
@@ -117,35 +128,36 @@ inline std::string encode_export_cursor(const std::string& chatJid, const std::s
     return base64_url_encode(slimr::write_json(j));
 }
 
-inline std::string encode_cursor(const ExportCursor& cur) {
+inline std::string encode_cursor(const ExportCursor &cur) {
     return encode_export_cursor(cur.c, cur.t, cur.i);
 }
 
-inline std::optional<ExportCursor> decode_export_cursor(const std::string& cursorStr) {
+inline std::optional<ExportCursor> decode_export_cursor(const std::string &cursorStr) {
     auto decoded = base64_url_decode(cursorStr);
-    if (!decoded) return std::nullopt;
+    if (!decoded)
+        return std::nullopt;
     try {
         auto jRes = slimr::parse_json(*decoded);
-        if (!jRes) return std::nullopt;
-        const auto& j = *jRes;
+        if (!jRes)
+            return std::nullopt;
+        const auto &j = *jRes;
         if (!j.is_object() || !j.contains("c") || !j.contains("t") || !j.contains("i")) {
             return std::nullopt;
         }
         return ExportCursor{
             j["c"].is_string() ? j["c"].get<std::string>() : "",
             j["t"].is_string() ? j["t"].get<std::string>() : "",
-            j["i"].is_string() ? j["i"].get<std::string>() : ""
-        };
+            j["i"].is_string() ? j["i"].get<std::string>() : ""};
     } catch (...) {
         return std::nullopt;
     }
 }
 
-inline std::optional<ExportCursor> decode_cursor(const std::string& cursorStr) {
+inline std::optional<ExportCursor> decode_cursor(const std::string &cursorStr) {
     return decode_export_cursor(cursorStr);
 }
 
-inline std::string build_setup_sql(const std::string& waPath) {
+inline std::string build_setup_sql(const std::string &waPath) {
     std::string sql;
     if (!waPath.empty() && std::filesystem::exists(waPath)) {
         std::string escapedWa = waPath;
@@ -216,27 +228,35 @@ CREATE TEMP VIEW IF NOT EXISTS v_contacts AS
 }
 
 inline std::string validate_read_only_sql(std::string_view sql) {
-    while (!sql.empty() && std::isspace(static_cast<unsigned char>(sql.front()))) sql.remove_prefix(1);
-    while (!sql.empty() && (std::isspace(static_cast<unsigned char>(sql.back())) || sql.back() == ';')) sql.remove_suffix(1);
-    while (!sql.empty() && std::isspace(static_cast<unsigned char>(sql.back()))) sql.remove_suffix(1);
-    if (sql.empty()) throw std::runtime_error("query is empty");
+    while (!sql.empty() && std::isspace(static_cast<unsigned char>(sql.front())))
+        sql.remove_prefix(1);
+    while (!sql.empty() && (std::isspace(static_cast<unsigned char>(sql.back())) || sql.back() == ';'))
+        sql.remove_suffix(1);
+    while (!sql.empty() && std::isspace(static_cast<unsigned char>(sql.back())))
+        sql.remove_suffix(1);
+    if (sql.empty())
+        throw std::runtime_error("query is empty");
 
     std::string_view body = sql;
     while (true) {
-        while (!body.empty() && std::isspace(static_cast<unsigned char>(body.front()))) body.remove_prefix(1);
+        while (!body.empty() && std::isspace(static_cast<unsigned char>(body.front())))
+            body.remove_prefix(1);
         if (body.starts_with("--")) {
             auto pos = body.find('\n');
-            if (pos == std::string_view::npos) throw std::runtime_error("query is empty");
+            if (pos == std::string_view::npos)
+                throw std::runtime_error("query is empty");
             body.remove_prefix(pos + 1);
         } else if (body.starts_with("/*")) {
             auto pos = body.find("*/");
-            if (pos == std::string_view::npos) throw std::runtime_error("query is empty");
+            if (pos == std::string_view::npos)
+                throw std::runtime_error("query is empty");
             body.remove_prefix(pos + 2);
         } else {
             break;
         }
     }
-    if (body.empty()) throw std::runtime_error("query is empty");
+    if (body.empty())
+        throw std::runtime_error("query is empty");
 
     std::string first;
     size_t i = 0;
@@ -299,7 +319,7 @@ struct ContactRow {
     std::string jid;
 };
 
-inline std::string format_message(const MessageRow& msg, const std::string& resolvedSender = "") {
+inline std::string format_message(const MessageRow &msg, const std::string &resolvedSender = "") {
     std::string out;
     std::string ts = msg.timestamp.size() >= 19 ? msg.timestamp.substr(0, 19) : msg.timestamp;
     if (!msg.chat_name.empty()) {
@@ -316,15 +336,16 @@ inline std::string format_message(const MessageRow& msg, const std::string& reso
     return out;
 }
 
-inline std::string format_export_lines(const ExportPage& page) {
+inline std::string format_export_lines(const ExportPage &page) {
     if (page.messages.empty()) {
         return "No messages in range.\n";
     }
     std::string out;
     std::string currentChat;
-    for (const auto& m : page.messages) {
+    for (const auto &m : page.messages) {
         if (m.chat_jid != currentChat) {
-            if (!currentChat.empty()) out += "\n";
+            if (!currentChat.empty())
+                out += "\n";
             std::string name = m.chat_name.empty() ? m.chat_jid : m.chat_name;
             out += "# " + name + " [" + m.chat_jid + "]\n";
             currentChat = m.chat_jid;
@@ -340,21 +361,29 @@ inline std::string format_export_lines(const ExportPage& page) {
         bool inSpace = false;
         for (char c : text) {
             if (std::isspace(static_cast<unsigned char>(c))) {
-                if (!inSpace) { collapsed.push_back(' '); inSpace = true; }
+                if (!inSpace) {
+                    collapsed.push_back(' ');
+                    inSpace = true;
+                }
             } else {
                 collapsed.push_back(c);
                 inSpace = false;
             }
         }
-        while (!collapsed.empty() && collapsed.front() == ' ') collapsed.erase(0, 1);
-        while (!collapsed.empty() && collapsed.back() == ' ') collapsed.pop_back();
+        while (!collapsed.empty() && collapsed.front() == ' ')
+            collapsed.erase(0, 1);
+        while (!collapsed.empty() && collapsed.back() == ' ')
+            collapsed.pop_back();
 
         if (!m.media_type.empty()) {
             std::string media = "[" + m.media_type;
-            if (!m.filename.empty()) media += ": " + m.filename;
+            if (!m.filename.empty())
+                media += ": " + m.filename;
             media += "]";
-            if (collapsed.empty()) collapsed = media;
-            else collapsed = media + " " + collapsed;
+            if (collapsed.empty())
+                collapsed = media;
+            else
+                collapsed = media + " " + collapsed;
         }
         out += ts + " | " + m.sender_name + " | " + collapsed + " [id=" + m.id + "]\n";
     }
@@ -365,7 +394,7 @@ inline std::string format_export_lines(const ExportPage& page) {
 }
 
 class WhatsAppDb {
-public:
+  public:
     explicit WhatsAppDb(std::string dataDir) : dataDir_(std::move(dataDir)) {
         if (dataDir_ != ":memory:") {
             msgPath_ = dataDir_ + "/messages.db";
@@ -376,12 +405,12 @@ public:
         }
     }
 
-    const std::string& dataDir() const noexcept { return dataDir_; }
-    const std::string& msgPath() const noexcept { return msgPath_; }
-    const std::string& waPath() const noexcept { return waPath_; }
+    const std::string &dataDir() const noexcept { return dataDir_; }
+    const std::string &msgPath() const noexcept { return msgPath_; }
+    const std::string &waPath() const noexcept { return waPath_; }
 
-    void ensureRegistered(slimr::SqliteDb& db) const {
-        db.registerFunction("wa_utc", [](const std::vector<slimr::SqlValue>& args) -> slimr::SqlValue {
+    void ensureRegistered(slimr::SqliteDb &db) const {
+        db.registerFunction("wa_utc", [](const std::vector<slimr::SqlValue> &args) -> slimr::SqlValue {
             if (args.empty()) return std::monostate{};
             if (std::holds_alternative<std::monostate>(args[0])) return std::monostate{};
             std::string s;
@@ -392,8 +421,7 @@ public:
             }
             auto norm = wa_utc_normalize(s);
             if (!norm) return std::monostate{};
-            return *norm;
-        }, true);
+            return *norm; }, true);
     }
 
     std::unique_ptr<slimr::SqliteDb> openDb() const {
@@ -402,7 +430,7 @@ public:
         return db;
     }
 
-    slimr::IterateResult querySql(const std::string& query, size_t limit = 200) const {
+    slimr::IterateResult querySql(const std::string &query, size_t limit = 200) const {
         std::string validated = validate_read_only_sql(query);
         std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
@@ -413,12 +441,13 @@ public:
         return db->iterateLimited(validated, opts);
     }
 
-    ExportPage exportMessages(const std::string& since,
-                              const std::optional<std::string>& until = std::nullopt,
-                              const std::vector<std::string>& chatJids = {},
-                              const std::string& cursor = "",
+    ExportPage exportMessages(const std::string &since,
+                              const std::optional<std::string> &until = std::nullopt,
+                              const std::vector<std::string> &chatJids = {},
+                              const std::string &cursor = "",
                               int limit = 500) const {
-        if (since.empty()) throw std::runtime_error("since is required");
+        if (since.empty())
+            throw std::runtime_error("since is required");
         std::string sinceUtc = parse_date_bound(since, false);
         std::string untilUtc;
         if (until && !until->empty()) {
@@ -427,8 +456,10 @@ public:
                 throw std::runtime_error("until must be after since");
             }
         }
-        if (limit <= 0) limit = 500;
-        if (limit > 5000) limit = 5000;
+        if (limit <= 0)
+            limit = 500;
+        if (limit > 5000)
+            limit = 5000;
 
         std::string sql = "SELECT id, chat_jid, COALESCE(chat_name, ''), sender, sender_name, is_from_me, ts_utc, "
                           "COALESCE(content, ''), COALESCE(media_type, ''), COALESCE(filename, '') FROM v_messages WHERE ";
@@ -443,7 +474,8 @@ public:
         if (!chatJids.empty()) {
             std::string ph = "chat_jid IN (";
             for (size_t i = 0; i < chatJids.size(); ++i) {
-                if (i > 0) ph += ",";
+                if (i > 0)
+                    ph += ",";
                 ph += "?";
                 params.push_back(chatJids[i]);
             }
@@ -453,7 +485,8 @@ public:
 
         if (!cursor.empty()) {
             auto cur = decode_export_cursor(cursor);
-            if (!cur) throw std::runtime_error("invalid cursor");
+            if (!cur)
+                throw std::runtime_error("invalid cursor");
             where.push_back("(chat_jid, ts_utc, id) > (?, ?, ?)");
             params.push_back(cur->c);
             params.push_back(cur->t);
@@ -461,7 +494,8 @@ public:
         }
 
         for (size_t i = 0; i < where.size(); ++i) {
-            if (i > 0) sql += " AND ";
+            if (i > 0)
+                sql += " AND ";
             sql += where[i];
         }
         sql += " ORDER BY chat_jid, ts_utc, id";
@@ -475,36 +509,47 @@ public:
         auto res = db->iterateLimited(sql, params, opts);
 
         ExportPage page;
-        for (const auto& row : res.rows) {
+        for (const auto &row : res.rows) {
             ExportMessage m;
-            if (row.contains("id")) m.id = row["id"].is_string() ? row["id"].get<std::string>() : "";
-            if (row.contains("chat_jid")) m.chat_jid = row["chat_jid"].is_string() ? row["chat_jid"].get<std::string>() : "";
-            if (row.contains("COALESCE(chat_name, '')")) m.chat_name = row["COALESCE(chat_name, '')"].is_string() ? row["COALESCE(chat_name, '')"].get<std::string>() : "";
-            if (row.contains("sender")) m.sender = row["sender"].is_string() ? row["sender"].get<std::string>() : "";
-            if (row.contains("sender_name")) m.sender_name = row["sender_name"].is_string() ? row["sender_name"].get<std::string>() : "";
+            if (row.contains("id"))
+                m.id = row["id"].is_string() ? row["id"].get<std::string>() : "";
+            if (row.contains("chat_jid"))
+                m.chat_jid = row["chat_jid"].is_string() ? row["chat_jid"].get<std::string>() : "";
+            if (row.contains("COALESCE(chat_name, '')"))
+                m.chat_name = row["COALESCE(chat_name, '')"].is_string() ? row["COALESCE(chat_name, '')"].get<std::string>() : "";
+            if (row.contains("sender"))
+                m.sender = row["sender"].is_string() ? row["sender"].get<std::string>() : "";
+            if (row.contains("sender_name"))
+                m.sender_name = row["sender_name"].is_string() ? row["sender_name"].get<std::string>() : "";
             m.is_from_me = json_val<bool>(row, "is_from_me");
-            if (row.contains("ts_utc")) m.ts_utc = row["ts_utc"].is_string() ? row["ts_utc"].get<std::string>() : "";
-            if (row.contains("COALESCE(content, '')")) m.content = row["COALESCE(content, '')"].is_string() ? row["COALESCE(content, '')"].get<std::string>() : "";
-            if (row.contains("COALESCE(media_type, '')")) m.media_type = row["COALESCE(media_type, '')"].is_string() ? row["COALESCE(media_type, '')"].get<std::string>() : "";
-            if (row.contains("COALESCE(filename, '')")) m.filename = row["COALESCE(filename, '')"].is_string() ? row["COALESCE(filename, '')"].get<std::string>() : "";
+            if (row.contains("ts_utc"))
+                m.ts_utc = row["ts_utc"].is_string() ? row["ts_utc"].get<std::string>() : "";
+            if (row.contains("COALESCE(content, '')"))
+                m.content = row["COALESCE(content, '')"].is_string() ? row["COALESCE(content, '')"].get<std::string>() : "";
+            if (row.contains("COALESCE(media_type, '')"))
+                m.media_type = row["COALESCE(media_type, '')"].is_string() ? row["COALESCE(media_type, '')"].get<std::string>() : "";
+            if (row.contains("COALESCE(filename, '')"))
+                m.filename = row["COALESCE(filename, '')"].is_string() ? row["COALESCE(filename, '')"].get<std::string>() : "";
             page.messages.push_back(std::move(m));
         }
 
         if (static_cast<int>(page.messages.size()) > limit) {
             page.messages.resize(limit);
-            const auto& last = page.messages.back();
+            const auto &last = page.messages.back();
             page.next_cursor = encode_export_cursor(last.chat_jid, last.ts_utc, last.id);
         }
 
         return page;
     }
 
-    std::vector<ChatRow> listChats(const std::optional<std::string>& query = std::nullopt,
+    std::vector<ChatRow> listChats(const std::optional<std::string> &query = std::nullopt,
                                    int limit = 20, int page = 0,
                                    bool includeLast = true,
-                                   const std::string& sortBy = "last_active") const {
-        if (limit <= 0) limit = 20;
-        if (page < 0) page = 0;
+                                   const std::string &sortBy = "last_active") const {
+        if (limit <= 0)
+            limit = 20;
+        if (page < 0)
+            page = 0;
         int offset = page * limit;
 
         std::string sql;
@@ -549,7 +594,7 @@ public:
         auto res = db->iterateLimited(sql, params, opts);
 
         std::vector<ChatRow> chats;
-        for (const auto& row : res.rows) {
+        for (const auto &row : res.rows) {
             ChatRow c;
             c.jid = json_val<std::string>(row, "jid");
             c.name = json_val<std::string>(row, "name");
@@ -571,7 +616,7 @@ public:
         return chats;
     }
 
-    std::vector<ContactRow> searchContacts(const std::string& query) const {
+    std::vector<ContactRow> searchContacts(const std::string &query) const {
         std::string pattern = "%" + query + "%";
         std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
@@ -594,7 +639,7 @@ SELECT DISTINCT jid, name, phone FROM (
 
         auto res = db->iterateLimited(sql, {pattern, pattern, pattern, pattern, pattern}, opts);
         std::vector<ContactRow> contacts;
-        for (const auto& row : res.rows) {
+        for (const auto &row : res.rows) {
             ContactRow cr;
             cr.jid = json_val<std::string>(row, "jid");
             cr.name = json_val<std::string>(row, "name");
@@ -604,7 +649,7 @@ SELECT DISTINCT jid, name, phone FROM (
         return contacts;
     }
 
-    ChatRow getChat(const std::string& chatJid, bool /*includeLast*/ = true) const {
+    ChatRow getChat(const std::string &chatJid, bool /*includeLast*/ = true) const {
         std::string sql = "SELECT c.jid, c.name, (c.jid LIKE '%@g.us') AS is_group, c.last_message_time, "
                           "m.content, m.sender, m.is_from_me FROM chats c "
                           "LEFT JOIN messages m ON c.jid = m.chat_jid AND c.last_message_time = m.timestamp "
@@ -618,7 +663,7 @@ SELECT DISTINCT jid, name, phone FROM (
         if (res.rows.empty()) {
             throw std::runtime_error("chat " + chatJid + " not found");
         }
-        const auto& row = res.rows.front();
+        const auto &row = res.rows.front();
         ChatRow c;
         c.jid = json_val<std::string>(row, "jid");
         c.name = json_val<std::string>(row, "name");
@@ -638,7 +683,7 @@ SELECT DISTINCT jid, name, phone FROM (
         return c;
     }
 
-    ChatRow getDirectChatByContact(const std::string& phone) const {
+    ChatRow getDirectChatByContact(const std::string &phone) const {
         std::string sql = "SELECT c.jid, c.name, (c.jid LIKE '%@g.us') AS is_group, c.last_message_time, "
                           "m.content, m.sender, m.is_from_me FROM chats c "
                           "LEFT JOIN messages m ON c.jid = m.chat_jid AND c.last_message_time = m.timestamp "
@@ -652,7 +697,7 @@ SELECT DISTINCT jid, name, phone FROM (
         if (res.rows.empty()) {
             throw std::runtime_error("no direct chat found for " + phone);
         }
-        const auto& row = res.rows.front();
+        const auto &row = res.rows.front();
         ChatRow c;
         c.jid = json_val<std::string>(row, "jid");
         c.name = json_val<std::string>(row, "name");
@@ -672,9 +717,11 @@ SELECT DISTINCT jid, name, phone FROM (
         return c;
     }
 
-    std::vector<ChatRow> getContactChats(const std::string& jid, int limit = 20, int page = 0) const {
-        if (limit <= 0) limit = 20;
-        if (page < 0) page = 0;
+    std::vector<ChatRow> getContactChats(const std::string &jid, int limit = 20, int page = 0) const {
+        if (limit <= 0)
+            limit = 20;
+        if (page < 0)
+            page = 0;
         int offset = page * limit;
 
         std::string sql = "SELECT DISTINCT c.jid, c.name, (c.jid LIKE '%@g.us') AS is_group, c.last_message_time, "
@@ -690,7 +737,7 @@ SELECT DISTINCT jid, name, phone FROM (
         auto res = db->iterateLimited(sql, {jid, jid, static_cast<int64_t>(limit), static_cast<int64_t>(offset)}, opts);
 
         std::vector<ChatRow> chats;
-        for (const auto& row : res.rows) {
+        for (const auto &row : res.rows) {
             ChatRow c;
             c.jid = json_val<std::string>(row, "jid");
             c.name = json_val<std::string>(row, "name");
@@ -712,16 +759,18 @@ SELECT DISTINCT jid, name, phone FROM (
         return chats;
     }
 
-    std::string listMessages(const std::optional<std::string>& after = std::nullopt,
-                             const std::optional<std::string>& before = std::nullopt,
-                             const std::optional<std::string>& sender = std::nullopt,
-                             const std::optional<std::string>& chatJid = std::nullopt,
-                             const std::optional<std::string>& query = std::nullopt,
+    std::string listMessages(const std::optional<std::string> &after = std::nullopt,
+                             const std::optional<std::string> &before = std::nullopt,
+                             const std::optional<std::string> &sender = std::nullopt,
+                             const std::optional<std::string> &chatJid = std::nullopt,
+                             const std::optional<std::string> &query = std::nullopt,
                              int limit = 200, int page = 0,
                              bool includeContext = true,
                              int ctxBefore = 1, int ctxAfter = 1) const {
-        if (limit <= 0) limit = 200;
-        if (page < 0) page = 0;
+        if (limit <= 0)
+            limit = 200;
+        if (page < 0)
+            page = 0;
 
         std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
@@ -734,8 +783,10 @@ SELECT DISTINCT jid, name, phone FROM (
         if (query && !query->empty()) {
             std::string safeQ;
             for (char c : *query) {
-                if (c == '"') safeQ += "\"\"";
-                else safeQ += c;
+                if (c == '"')
+                    safeQ += "\"\"";
+                else
+                    safeQ += c;
             }
             std::string ftsMatch = "\"" + safeQ + "\"";
 
@@ -763,7 +814,7 @@ SELECT DISTINCT jid, name, phone FROM (
             params.push_back(static_cast<int64_t>(limit));
 
             auto res = db->iterateLimited(sql, params, opts);
-            for (const auto& row : res.rows) {
+            for (const auto &row : res.rows) {
                 MessageRow m;
                 m.timestamp = json_val<std::string>(row, "timestamp");
                 m.sender = json_val<std::string>(row, "sender");
@@ -773,7 +824,8 @@ SELECT DISTINCT jid, name, phone FROM (
                 m.chat_jid = json_val<std::string>(row, "jid");
                 m.id = json_val<std::string>(row, "id");
                 m.media_type = json_val<std::string>(row, "media_type");
-                if (sender && !sender->empty() && m.sender != *sender) continue;
+                if (sender && !sender->empty() && m.sender != *sender)
+                    continue;
                 msgs.push_back(std::move(m));
             }
         } else {
@@ -802,7 +854,8 @@ SELECT DISTINCT jid, name, phone FROM (
             if (!where.empty()) {
                 sql += "WHERE ";
                 for (size_t i = 0; i < where.size(); ++i) {
-                    if (i > 0) sql += " AND ";
+                    if (i > 0)
+                        sql += " AND ";
                     sql += where[i];
                 }
                 sql += " ";
@@ -812,7 +865,7 @@ SELECT DISTINCT jid, name, phone FROM (
             params.push_back(static_cast<int64_t>(page * limit));
 
             auto res = db->iterateLimited(sql, params, opts);
-            for (const auto& row : res.rows) {
+            for (const auto &row : res.rows) {
                 MessageRow m;
                 m.timestamp = json_val<std::string>(row, "timestamp");
                 m.sender = json_val<std::string>(row, "sender");
@@ -835,18 +888,20 @@ SELECT DISTINCT jid, name, phone FROM (
         }
 
         std::string text = std::string(UNTRUSTED_HEADER);
-        for (const auto& m : msgs) {
+        for (const auto &m : msgs) {
             text += format_message(m, resolveSenderName(db.get(), m.sender));
         }
         return text;
     }
 
-    std::string resolveSenderName(slimr::SqliteDb* db, const std::string& sender) const {
-        if (sender.empty()) return "";
+    std::string resolveSenderName(slimr::SqliteDb *db, const std::string &sender) const {
+        if (sender.empty())
+            return "";
         try {
             std::string phonePart = sender;
             auto atPos = sender.find('@');
-            if (atPos != std::string::npos) phonePart = sender.substr(0, atPos);
+            if (atPos != std::string::npos)
+                phonePart = sender.substr(0, atPos);
 
             slimr::IterateOptions opts;
             opts.readOnlyConnection = (msgPath_ != ":memory:");
@@ -854,29 +909,32 @@ SELECT DISTINCT jid, name, phone FROM (
             auto res = db->iterateLimited("SELECT name FROM t_names WHERE user = ? OR user = ? LIMIT 1", std::vector<slimr::SqlValue>{sender, phonePart}, opts);
             if (!res.rows.empty()) {
                 std::string n = json_val<std::string>(res.rows.front(), "name");
-                if (!n.empty()) return n;
+                if (!n.empty())
+                    return n;
             }
-        } catch (...) {}
+        } catch (...) {
+        }
         return sender;
     }
 
-    std::vector<MessageRow> expandContext(slimr::SqliteDb* db, const std::vector<MessageRow>& msgs, int before, int after) const {
-        if (msgs.empty() || (before <= 0 && after <= 0)) return msgs;
+    std::vector<MessageRow> expandContext(slimr::SqliteDb *db, const std::vector<MessageRow> &msgs, int before, int after) const {
+        if (msgs.empty() || (before <= 0 && after <= 0))
+            return msgs;
 
         std::vector<MessageRow> expanded;
-        for (const auto& msg : msgs) {
+        for (const auto &msg : msgs) {
             // Fetch before
             std::string sqlBefore = "SELECT messages.timestamp, messages.sender, chats.name, messages.content, "
-                                   "messages.is_from_me, chats.jid, messages.id, messages.media_type "
-                                   "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
-                                   "WHERE messages.chat_jid = ? AND messages.timestamp < ? "
-                                   "ORDER BY messages.timestamp DESC LIMIT ?";
+                                    "messages.is_from_me, chats.jid, messages.id, messages.media_type "
+                                    "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
+                                    "WHERE messages.chat_jid = ? AND messages.timestamp < ? "
+                                    "ORDER BY messages.timestamp DESC LIMIT ?";
             slimr::IterateOptions opts;
             opts.readOnlyConnection = (msgPath_ != ":memory:");
             opts.setupSql = build_setup_sql(waPath_);
             auto resBefore = db->iterateLimited(sqlBefore, {msg.chat_jid, msg.timestamp, static_cast<int64_t>(before)}, opts);
             std::vector<MessageRow> bList;
-            for (const auto& row : resBefore.rows) {
+            for (const auto &row : resBefore.rows) {
                 MessageRow m;
                 m.timestamp = json_val<std::string>(row, "timestamp");
                 m.sender = json_val<std::string>(row, "sender");
@@ -892,13 +950,13 @@ SELECT DISTINCT jid, name, phone FROM (
 
             // Fetch after
             std::string sqlAfter = "SELECT messages.timestamp, messages.sender, chats.name, messages.content, "
-                                  "messages.is_from_me, chats.jid, messages.id, messages.media_type "
-                                  "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
-                                  "WHERE messages.chat_jid = ? AND messages.timestamp > ? "
-                                  "ORDER BY messages.timestamp ASC LIMIT ?";
+                                   "messages.is_from_me, chats.jid, messages.id, messages.media_type "
+                                   "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
+                                   "WHERE messages.chat_jid = ? AND messages.timestamp > ? "
+                                   "ORDER BY messages.timestamp ASC LIMIT ?";
             auto resAfter = db->iterateLimited(sqlAfter, {msg.chat_jid, msg.timestamp, static_cast<int64_t>(after)}, opts);
             std::vector<MessageRow> aList;
-            for (const auto& row : resAfter.rows) {
+            for (const auto &row : resAfter.rows) {
                 MessageRow m;
                 m.timestamp = json_val<std::string>(row, "timestamp");
                 m.sender = json_val<std::string>(row, "sender");
@@ -918,7 +976,7 @@ SELECT DISTINCT jid, name, phone FROM (
         return expanded;
     }
 
-    slimr::Json getMessageContext(const std::string& messageId, int before = 5, int after = 5) const {
+    slimr::Json getMessageContext(const std::string &messageId, int before = 5, int after = 5) const {
         std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
@@ -926,14 +984,14 @@ SELECT DISTINCT jid, name, phone FROM (
         opts.setupSql = build_setup_sql(waPath_);
 
         std::string sqlTarget = "SELECT messages.timestamp, messages.sender, chats.name, messages.content, "
-                               "messages.is_from_me, chats.jid, messages.id, messages.media_type "
-                               "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
-                               "WHERE messages.id = ?";
+                                "messages.is_from_me, chats.jid, messages.id, messages.media_type "
+                                "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
+                                "WHERE messages.id = ?";
         auto resTarget = db->iterateLimited(sqlTarget, {messageId}, opts);
         if (resTarget.rows.empty()) {
             throw std::runtime_error("message " + messageId + " not found");
         }
-        const auto& tRow = resTarget.rows.front();
+        const auto &tRow = resTarget.rows.front();
         MessageRow target;
         target.timestamp = json_val<std::string>(tRow, "timestamp");
         target.sender = json_val<std::string>(tRow, "sender");
@@ -945,14 +1003,14 @@ SELECT DISTINCT jid, name, phone FROM (
         target.media_type = json_val<std::string>(tRow, "media_type");
 
         std::string sqlBefore = "SELECT messages.timestamp, messages.sender, chats.name, messages.content, "
-                               "messages.is_from_me, chats.jid, messages.id, messages.media_type "
-                               "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
-                               "WHERE messages.chat_jid = ? AND messages.timestamp < ? "
-                               "ORDER BY messages.timestamp DESC LIMIT ?";
+                                "messages.is_from_me, chats.jid, messages.id, messages.media_type "
+                                "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
+                                "WHERE messages.chat_jid = ? AND messages.timestamp < ? "
+                                "ORDER BY messages.timestamp DESC LIMIT ?";
         auto resBefore = db->iterateLimited(sqlBefore, {target.chat_jid, target.timestamp, static_cast<int64_t>(before)}, opts);
         slimr::Json beforeArr = slimr::Json::array_t{};
         std::vector<slimr::Json> bList;
-        for (const auto& r : resBefore.rows) {
+        for (const auto &r : resBefore.rows) {
             slimr::Json m = slimr::Json::object_t{};
             m["timestamp"] = json_val<std::string>(r, "timestamp");
             m["sender"] = json_val<std::string>(r, "sender");
@@ -967,16 +1025,17 @@ SELECT DISTINCT jid, name, phone FROM (
             bList.push_back(std::move(m));
         }
         std::reverse(bList.begin(), bList.end());
-        for (auto& item : bList) beforeArr.get_array().push_back(std::move(item));
+        for (auto &item : bList)
+            beforeArr.get_array().push_back(std::move(item));
 
         std::string sqlAfter = "SELECT messages.timestamp, messages.sender, chats.name, messages.content, "
-                              "messages.is_from_me, chats.jid, messages.id, messages.media_type "
-                              "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
-                              "WHERE messages.chat_jid = ? AND messages.timestamp > ? "
-                              "ORDER BY messages.timestamp ASC LIMIT ?";
+                               "messages.is_from_me, chats.jid, messages.id, messages.media_type "
+                               "FROM messages JOIN chats ON messages.chat_jid = chats.jid "
+                               "WHERE messages.chat_jid = ? AND messages.timestamp > ? "
+                               "ORDER BY messages.timestamp ASC LIMIT ?";
         auto resAfter = db->iterateLimited(sqlAfter, {target.chat_jid, target.timestamp, static_cast<int64_t>(after)}, opts);
         slimr::Json afterArr = slimr::Json::array_t{};
-        for (const auto& r : resAfter.rows) {
+        for (const auto &r : resAfter.rows) {
             slimr::Json m = slimr::Json::object_t{};
             m["timestamp"] = json_val<std::string>(r, "timestamp");
             m["sender"] = json_val<std::string>(r, "sender");
@@ -999,7 +1058,8 @@ SELECT DISTINCT jid, name, phone FROM (
         targetJson["is_from_me"] = target.is_from_me;
         targetJson["chat_jid"] = target.chat_jid;
         targetJson["id"] = target.id;
-        if (!target.media_type.empty()) targetJson["media_type"] = target.media_type;
+        if (!target.media_type.empty())
+            targetJson["media_type"] = target.media_type;
 
         slimr::Json res = slimr::Json::object_t{};
         res["message"] = targetJson;
@@ -1008,7 +1068,7 @@ SELECT DISTINCT jid, name, phone FROM (
         return res;
     }
 
-    std::string getLastInteraction(const std::string& jid) const {
+    std::string getLastInteraction(const std::string &jid) const {
         std::lock_guard<std::mutex> lock(db_mutex_for(msgPath_));
         auto db = openDb();
         slimr::IterateOptions opts;
@@ -1024,7 +1084,7 @@ SELECT DISTINCT jid, name, phone FROM (
         if (res.rows.empty()) {
             throw std::runtime_error("no interaction found for " + jid);
         }
-        const auto& r = res.rows.front();
+        const auto &r = res.rows.front();
         MessageRow m;
         m.timestamp = json_val<std::string>(r, "timestamp");
         m.sender = json_val<std::string>(r, "sender");
@@ -1038,7 +1098,7 @@ SELECT DISTINCT jid, name, phone FROM (
         return std::string(UNTRUSTED_HEADER) + format_message(m, resolveSenderName(db.get(), m.sender));
     }
 
-private:
+  private:
     std::string dataDir_;
     std::string msgPath_;
     std::string waPath_;

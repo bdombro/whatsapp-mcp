@@ -1,7 +1,7 @@
 #define SLIMR_TEST_MAIN
-#include "test.hpp"
 #include "app.hpp"
 #include "oauth_as.hpp"
+#include "test.hpp"
 
 #include <mcp_http.hpp>
 
@@ -42,13 +42,13 @@ struct MockSocketServer {
     std::atomic<int> pair_cancel_calls{0};
     std::atomic<int> send_calls{0};
 
-    explicit MockSocketServer(const std::filesystem::path& p) : sock_path(p) {
+    explicit MockSocketServer(const std::filesystem::path &p) : sock_path(p) {
         server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
         struct sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         std::strncpy(addr.sun_path, sock_path.c_str(), sizeof(addr.sun_path) - 1);
         unlink(sock_path.c_str());
-        int brc = bind(server_fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+        int brc = bind(server_fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
         REQUIRE(brc == 0);
         int lrc = listen(server_fd, 16);
         REQUIRE(lrc == 0);
@@ -123,8 +123,10 @@ struct MockSocketServer {
 
     ~MockSocketServer() {
         stop.store(true);
-        if (worker.joinable()) worker.join();
-        if (server_fd >= 0) close(server_fd);
+        if (worker.joinable())
+            worker.join();
+        if (server_fd >= 0)
+            close(server_fd);
         unlink(sock_path.c_str());
     }
 };
@@ -192,7 +194,7 @@ TEST_CASE("path allowlist for send_file") {
     }
 
     SUBCASE("reject path under ~/Library") {
-        const char* home = std::getenv("HOME");
+        const char *home = std::getenv("HOME");
         if (home) {
             std::string lib_path = std::string(home) + "/Library/Preferences/com.apple.finder.plist";
             if (std::filesystem::exists(lib_path)) {
@@ -206,8 +208,7 @@ TEST_CASE("cursor encode/decode") {
     ExportCursor cur{
         .c = "15550000000@s.whatsapp.net",
         .t = "2026-11-08 14:00:00",
-        .i = "ABCDEF123456"
-    };
+        .i = "ABCDEF123456"};
 
     auto enc = encode_cursor(cur);
     CHECK_FALSE(enc.empty());
@@ -377,15 +378,13 @@ TEST_CASE("sqlite database, FTS5 and session-key isolation") {
         CHECK_THROWS_WITH_AS(
             db.querySql("SELECT * FROM whatsmeow_device", 10),
             doctest::Contains("no such table: whatsmeow_device"),
-            std::runtime_error
-        );
+            std::runtime_error);
 
         // wasrc was detached and cannot be queried
         CHECK_THROWS_WITH_AS(
             db.querySql("SELECT * FROM wasrc.whatsmeow_device", 10),
             doctest::Contains("no such table"),
-            std::runtime_error
-        );
+            std::runtime_error);
     }
 
     SUBCASE("PRAGMA query_only blocks all writes") {
@@ -436,8 +435,7 @@ TEST_CASE("mock unix socket send and download") {
         CHECK_THROWS_WITH_AS(
             daemon_download(sock_path.string(), "m123", "friend@s.whatsapp.net", temp.path.string()),
             doctest::Contains("outside downloads directory"),
-            std::runtime_error
-        );
+            std::runtime_error);
     }
 }
 
@@ -481,17 +479,18 @@ struct HttpTestResp {
 
 inline std::string lower_ascii(std::string_view s) {
     std::string out(s);
-    for (char& c : out) {
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    for (char &c : out) {
+        if (c >= 'A' && c <= 'Z')
+            c = static_cast<char>(c - 'A' + 'a');
     }
     return out;
 }
 
 inline HttpTestResp http_request(uint16_t port,
-                                 const std::string& method,
-                                 const std::string& target,
-                                 const std::vector<std::pair<std::string, std::string>>& headers = {},
-                                 const std::string& body = {}) {
+                                 const std::string &method,
+                                 const std::string &target,
+                                 const std::vector<std::pair<std::string, std::string>> &headers = {},
+                                 const std::string &body = {}) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     REQUIRE(fd >= 0);
 
@@ -499,14 +498,15 @@ inline HttpTestResp http_request(uint16_t port,
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     REQUIRE(inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == 1);
-    REQUIRE(connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0);
+    REQUIRE(connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) == 0);
 
     std::string req = method + " " + target + " HTTP/1.1\r\n";
     req += "Host: 127.0.0.1:" + std::to_string(port) + "\r\n";
     req += "Connection: close\r\n";
     bool hasContentLen = false;
-    for (const auto& [k, v] : headers) {
-        if (lower_ascii(k) == "content-length") hasContentLen = true;
+    for (const auto &[k, v] : headers) {
+        if (lower_ascii(k) == "content-length")
+            hasContentLen = true;
         req += k + ": " + v + "\r\n";
     }
     if (!body.empty() && !hasContentLen) {
@@ -526,7 +526,8 @@ inline HttpTestResp http_request(uint16_t port,
     char buf[4096];
     for (;;) {
         ssize_t n = read(fd, buf, sizeof(buf));
-        if (n <= 0) break;
+        if (n <= 0)
+            break;
         raw.append(buf, static_cast<size_t>(n));
     }
     close(fd);
@@ -541,7 +542,8 @@ inline HttpTestResp http_request(uint16_t port,
     bool firstLine = true;
     while (lineStart < hdrBlock.size()) {
         size_t lineEnd = hdrBlock.find("\r\n", lineStart);
-        if (lineEnd == std::string::npos) lineEnd = hdrBlock.size();
+        if (lineEnd == std::string::npos)
+            lineEnd = hdrBlock.size();
         std::string line = hdrBlock.substr(lineStart, lineEnd - lineStart);
         lineStart = lineEnd + 2;
 
@@ -567,7 +569,7 @@ inline HttpTestResp http_request(uint16_t port,
     return resp;
 }
 
-inline std::string extract_hidden_input(const std::string& html, const std::string& name) {
+inline std::string extract_hidden_input(const std::string &html, const std::string &name) {
     std::string needle = "name=\"" + name + "\" value=\"";
     size_t pos = html.find(needle);
     REQUIRE(pos != std::string::npos);
@@ -577,9 +579,9 @@ inline std::string extract_hidden_input(const std::string& html, const std::stri
     return html.substr(pos, end - pos);
 }
 
-inline std::string extract_cookie_pair(const std::vector<std::string>& setCookies, const std::string& name) {
+inline std::string extract_cookie_pair(const std::vector<std::string> &setCookies, const std::string &name) {
     std::string prefix = name + "=";
-    for (const auto& sc : setCookies) {
+    for (const auto &sc : setCookies) {
         if (sc.rfind(prefix, 0) == 0) {
             size_t semi = sc.find(';');
             return (semi == std::string::npos) ? sc : sc.substr(0, semi);
@@ -588,9 +590,10 @@ inline std::string extract_cookie_pair(const std::vector<std::string>& setCookie
     return "";
 }
 
-inline std::string extract_query_param(const std::string& url, const std::string& name) {
+inline std::string extract_query_param(const std::string &url, const std::string &name) {
     size_t q = url.find('?');
-    if (q == std::string::npos) return "";
+    if (q == std::string::npos)
+        return "";
     auto params = oauth_detail::parse_form_urlencoded(url.substr(q + 1));
     auto it = params.find(name);
     return (it == params.end()) ? "" : it->second;
@@ -599,8 +602,9 @@ inline std::string extract_query_param(const std::string& url, const std::string
 struct ScopedEnvVar {
     std::string name;
     std::optional<std::string> prev;
-    ScopedEnvVar(std::string k, const std::string& v) : name(std::move(k)) {
-        if (const char* old = std::getenv(name.c_str())) prev = std::string(old);
+    ScopedEnvVar(std::string k, const std::string &v) : name(std::move(k)) {
+        if (const char *old = std::getenv(name.c_str()))
+            prev = std::string(old);
         setenv(name.c_str(), v.c_str(), 1);
     }
     ~ScopedEnvVar() {
@@ -618,7 +622,7 @@ inline slimr::Json parse_json_ok(std::string_view s) {
     return *p;
 }
 
-inline void seed_test_messages_db(const std::filesystem::path& dbPath) {
+inline void seed_test_messages_db(const std::filesystem::path &dbPath) {
     slimr::Database db(dbPath.string());
     db.exec(
         "CREATE TABLE chats (jid TEXT PRIMARY KEY, name TEXT, last_message_time TIMESTAMP);"
@@ -630,8 +634,7 @@ inline void seed_test_messages_db(const std::filesystem::path& dbPath) {
         "('15551234567@s.whatsapp.net', 'Alice', '2026-11-10 10:00:00 +0000 UTC');"
         "INSERT INTO messages (id, chat_jid, sender, content, timestamp, is_from_me) VALUES "
         "('m-http-1', '15551234567@s.whatsapp.net', '15551234567@s.whatsapp.net', "
-        "'Hello from WhatsApp HTTP test', '2026-11-10 10:00:00 +0000 UTC', 0);"
-    );
+        "'Hello from WhatsApp HTTP test', '2026-11-10 10:00:00 +0000 UTC', 0);");
 }
 
 } // namespace
@@ -673,7 +676,7 @@ TEST_CASE("qr_to_svg encoding and structure") {
         bool threw = false;
         try {
             (void)qr_to_svg(tooBig);
-        } catch (const std::exception&) {
+        } catch (const std::exception &) {
             threw = true;
         }
         CHECK(threw);
@@ -686,7 +689,7 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
     auto tmpDir = std::filesystem::path("wa_http_oauth_test");
     std::filesystem::remove_all(tmpDir);
     std::filesystem::create_directories(tmpDir);
-    auto cleanup = std::shared_ptr<void>(nullptr, [tmpDir](void*) {
+    auto cleanup = std::shared_ptr<void>(nullptr, [tmpDir](void *) {
         std::filesystem::remove_all(tmpDir);
     });
 
@@ -717,7 +720,7 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
     slimr::McpHttpServer server(app, httpOpts);
     std::string startErr;
     REQUIRE(server.start(&startErr));
-    auto stopServer = std::shared_ptr<void>(nullptr, [&server](void*) { server.stop(); });
+    auto stopServer = std::shared_ptr<void>(nullptr, [&server](void *) { server.stop(); });
 
     const uint16_t port = server.boundPort();
     REQUIRE(port > 0);
@@ -872,7 +875,7 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
     std::string readToken;
     std::string refreshToken1;
     {
-        auto issueCode = [&](const std::string& challenge) -> std::string {
+        auto issueCode = [&](const std::string &challenge) -> std::string {
             std::string path = "/authorize?response_type=code&client_id=" + oauth_detail::url_encode(clientId) +
                                "&redirect_uri=" + oauth_detail::url_encode(redirectUri) +
                                "&code_challenge=" + oauth_detail::url_encode(challenge) +
@@ -1029,7 +1032,8 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
                 }
             });
         }
-        for (auto& w : workers) w.join();
+        for (auto &w : workers)
+            w.join();
         CHECK(okCount.load() == 16);
     }
 
@@ -1172,4 +1176,3 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
         CHECK(!s.start(&err));
     }
 }
-
