@@ -5,7 +5,7 @@ User installation, configuration and compatibility status are in the
 alternative transport schemas and validation commands. A client configuration
 example is not a claim of verified July/OAuth interoperability.
 
-Dependencies resolve directly from the pinned `bdombro/slimr-*` vcpkg git
+Dependencies resolve directly from the pinned `slimr-down-now/*` vcpkg git
 registries in `mcp/vcpkg-configuration.json` (no local overlays). CI
 configuration is not evidence that a runner/platform/client has passed.
 
