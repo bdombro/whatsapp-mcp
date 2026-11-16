@@ -2,6 +2,7 @@
 #include "app.hpp"
 #include "oauth_as.hpp"
 #include "test.hpp"
+#include "test_log_file.hpp"
 
 #include <mcp_http.hpp>
 
