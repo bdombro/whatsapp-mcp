@@ -1,16 +1,20 @@
 {
   "default-registry": {
     "kind": "builtin",
-    "baseline": "4df3365fcbb4795a44795883f8719bbb3b3bcd77"
+    "baseline": "e1ec0c7e1479434c630558596277ae19cae08c09"
   },
-  "overlay-ports": [
-    "../../../../../slimr/serve/ports/slimr-serve",
-    "../../../../../slimr/mcp/ports/slimr-mcp"
-  ],
   "registries": [
     {
       "kind": "git",
-      "baseline": "75da5e3fe947ad52d5516c10eaf5c4e9fc2fe9a1",
+      "baseline": "c73a85e6b82705570c1e6a7b58b05cb9f77dc638",
+      "repository": "https://github.com/slimr-down-now/serve.git",
+      "packages": [
+        "slimr-serve"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "d295af4d3dbd54517bee107a1c6d69f0a41c1287",
       "repository": "https://github.com/slimr-down-now/mcp.git",
       "packages": [
         "slimr-mcp"

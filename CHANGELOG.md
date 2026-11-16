@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Internal: strip overlay-ports and pin slimr-mcp v0.2.0 and slimr-serve v0.1.1 baselines
 - Migrate `whatsapp-mcp` to `slimr-serve` typed `OutputStruct` handlers via `slimr-mcp` adapter and drop stdio `mcp` subcommand (HTTP-only MCP + narrow JSON CLI)
 - Fix direct CLI tool calls (`<bin> <tool> '{...}'`), disabled by default since `slimr-mcp` v0.1.4
 - Internal: replace slimr-curl/libhv with cpp-httplib (AF_UNIX daemon client) and upgrade slimr-mcp/slimr-bugsink
