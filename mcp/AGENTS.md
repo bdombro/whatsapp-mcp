@@ -2,9 +2,9 @@
 
 Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server and CLI.
 
-`whatsapp-mcp/mcp` is a standalone C++26 application built on `slimr-cpp` (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) and CLI commands against `~/.local/share/whatsapp-client/messages.db` and `daemon.sock`.
+`whatsapp-mcp/mcp` is a standalone C++26 application built on the `slimr-*` libraries (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) and CLI commands against `$(brew --prefix)/var/whatsapp-client/messages.db` and `daemon.sock` (`WHATSAPP_CLIENT_DATA_DIR` overrides).
 
-Over Streamable HTTP (`whatsapp-mcp http --host 127.0.0.1 --port 10008`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
+Over Streamable HTTP (`whatsapp-mcp http`, default `0.0.0.0:10008`; OAuth `publicBaseUrl` stays `127.0.0.1`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
 
 
 ## Documentation Upkeep
@@ -18,11 +18,13 @@ with implemented behavior; do not claim unverified release or client support.
 
 | Task | Command |
 | --- | --- |
-| Run unit & isolation tests (ASan + UBSan) | `just test` |
-| Build release binary (`build/bin/whatsapp-mcp`) | `just build` |
-| Static analysis (root `.clang-tidy`) | `just lint` |
+| Run unit & isolation tests (ASan + UBSan) | `just test ["<filter>"]` |
+| Build release binary (`build/bin/whatsapp-mcp`, no tests) | `just build` |
+| Format / static analysis (`.clang-tidy`) | `just fmt`, `just lint` |
 | Isolated MCP startup/discovery | `just test-mcp` |
 | Clean build artifacts | `just clean` |
+
+Release, install and `daemon-*` live in the repository-root justfile (two formulas); `CHANGELOG.md` and `VERSION` are at the repository root.
 
 ## Rules
 
@@ -38,15 +40,9 @@ with implemented behavior; do not claim unverified release or client support.
 
 ## Build Architecture
 
-CMake declares targets/dependencies; Ninja owns incremental builds. Just orchestrates automatic `deps` before configure/build/test/lint; CMake manifest auto-install is disabled. Set `VCPKG_ROOT` and `VCPKG_OVERLAY_PORTS` in the environment. Dependencies install under `build/deps/`; Debug sanitizer and Release trees live under `build/cmake/`. Use installed slimr targets, never source-checkout include overrides. SQLite is statically linked with FTS5. `run` does not rebuild.
+CMake declares targets/dependencies; Ninja owns incremental builds. Dependencies resolve from the pinned `slimr-*` registries in `vcpkg-configuration.json` (no overlays) and install under `build/deps/`; Debug sanitizer and Release trees live under `build/cmake/`. SQLite is statically linked with FTS5. `test-mcp` checks July discovery over stdio and ephemeral HTTP (OAuth-protected) with Bun against a scratch data dir; it does not call tools, open user databases, or connect to/start the daemon.
 
-Use a Clang/C++26 toolchain with libc++ FAST hardening, CMake, Ninja, vcpkg, just, and compatible clang-tidy. `test-mcp` checks July discovery over stdio and ephemeral HTTP with Node and an isolated server environment; it does not call tools, open user databases, or connect to/start the daemon.
+<!-- cpp-templates:begin -->
+## Tooling alignment
 
-## C++ Memory Safety
-
-- Immediately wrap owned C handles, allocations, descriptors, and temporary resources in RAII. Make owning wrappers noncopyable unless copying creates independent ownership; moves must leave the source safely destructible.
-- Borrow views, pointers, and references only for the current call by default. Store owning values unless lifetime/invalidation guarantees are explicit. Deferred callbacks require explicit ownership-safe captures; no escaping reference captures without a demonstrated lifetime guarantee.
-- Initialize scalar/pointer members at declaration and local values before use. Compiler auto-initialization is defense in depth, not permission for uninitialized reads.
-- Check range/overflow before narrowing lengths/counts at C API boundaries; casts alone are not validation. Report invalid inputs using existing error mechanisms.
-- Never let C++ exceptions escape C callbacks. Translate them into the C API's error/abort mechanism and propagate failures at the C++ boundary; do not silently swallow them.
-- Preserve hardening, zero auto-initialization, ASan/UBSan with fatal reports, and required lint/tests. These checks do not prove memory safety.
+Align this repository via the `cpp-templates` skill (`just check <template> .`). Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->

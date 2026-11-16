@@ -4,7 +4,7 @@
 
 ## App Architecture
 
-The stateless MCP server and JSON CLI are implemented in C++26 on `slimr-cpp`. It reads `messages.db` and uses the companion Go `whatsapp-client` only for sends and media downloads.
+The stateless MCP server and JSON CLI are implemented in C++26 on the `slimr-*` libraries, aligned to the cpp-templates `homebrew-mcp` template. It reads `messages.db` and uses the companion Go `whatsapp-client` only for sends and media downloads.
 
 ## Cryptographic Session-Key Isolation & SQLite Views
 
@@ -19,7 +19,7 @@ The stateless MCP server and JSON CLI are implemented in C++26 on `slimr-cpp`. I
 
 ## HTTP Transport, OAuth 2.1 & Browser Connect UX
 
-When launched via `whatsapp-mcp http --host 127.0.0.1 --port 10008` (default port `10008`), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
+When launched via `whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]` (default bind `0.0.0.0:10008`; OAuth metadata and `publicBaseUrl` advertise `http://127.0.0.1:<port>` unless `--host` names a specific address), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
 - `GET /.well-known/oauth-protected-resource` (RFC 9728) & `GET /.well-known/oauth-authorization-server` (RFC 8414)
 - `POST /register` (RFC 7591 dynamic client registration restricted to loopback redirect URIs)
 - `GET /authorize` + `GET /authorize/qr` + `POST /authorize/approve` + `POST /authorize/cancel` (CSRF-protected browser Connect page; renders live QR SVG when `whatsapp-client` is unpaired, or shows the already-paired JID for explicit owner approval without touching `whatsapp.db`)
@@ -43,22 +43,25 @@ When launched via `whatsapp-mcp http --host 127.0.0.1 --port 10008` (default por
 
 ## Building & Testing
 
-Build this directory with Clang/C++26 and libc++ FAST hardening, CMake 3.31+, Ninja, [just](https://just.systems), [vcpkg](https://vcpkg.io), and compatible clang-tidy. Set `VCPKG_ROOT` to a bootstrapped checkout and make `vcpkg` available on `PATH`; configure the local overlay explicitly:
+Prerequisites, Linux notes and the release flow are in the
+[repository developer reference](../../docs/development.md#building--testing);
+`just doctor` checks them. Dependencies resolve from the pinned `slimr-*`
+registries in `vcpkg-configuration.json` and install under `build/deps/`
+automatically before configure/build/test/lint; CMake manifest auto-install is
+disabled.
+
+Debug sanitizer and Release IPO graphs live in `build/cmake/Debug/` and `build/cmake/Release/`; only Release binaries are emitted to `build/bin/`. Both enable libc++ FAST hardening and zero automatic-variable initialization; Debug adds ASan and fatal UBSan. CTest runs database and mock-socket fixtures with a finite timeout, `BUGSINK_DSN=""`, and isolated repo-local HOME/XDG/temporary directories and `HOMEBREW_PREFIX`.
 
 ```bash
-export VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"
+just test              # C++26 unit & isolation tests (wa_utc, key isolation, FTS5, views, export, mock socket) with ASan + UBSan
+just test "<filter>"   # Build the test target and run matching doctest cases
+just build             # Optimized IPO Release binary at build/bin/whatsapp-mcp (no tests)
+just fmt               # Format C++ sources and justfile
+just lint              # Format check + clang-tidy (.clang-tidy)
+just test-mcp          # Bun stdio + ephemeral HTTP MCP 2026-07-28 discovery (OAuth-protected), isolated
+just clean             # Remove build/ only; leaves user data untouched
 ```
 
-`just configure`, `test`, `build`, and `lint` automatically run `deps`, installing manifest dependencies under `build/deps/`. CMake uses installed `slimr::mcp_http` and `slimr::sqlite` targets with static SQLite/FTS5; manifest auto-install is disabled. Local overlay ports must already be registered; no source-checkout include overrides or global executable installs are used. Registry publication is separate.
+For local development without touching the installed service (`10008`), run `./build/bin/whatsapp-mcp http --port 20008` with a scratch `WHATSAPP_CLIENT_DATA_DIR`.
 
-Debug sanitizers and Release IPO builds have separate `build/cmake/Debug/` and `build/cmake/Release/` graphs. Both enable libc++ hardening and zero automatic-variable initialization; Debug adds ASan and fatal UBSan. Set `CXX` before the first configure to override the default Apple compiler on macOS or `clang++` on Linux; subsequent configures preserve CMake's cached compiler even when clang-tidy is added to `PATH`. CTest runs database and mock-socket fixtures with a finite timeout and isolated repo-local HOME/XDG/temporary directories. Release builds run those tests too.
-
-```bash
-just test     # Run C++26 unit & isolation tests (wa_utc, key isolation, FTS5, views, export, mock socket) with ASan + UBSan
-just build    # Build/test Release binary at build/bin/whatsapp-mcp
-just lint     # Analyze app and test units with the root .clang-tidy and compile_commands.json
-just test-mcp # July MCP stdio + ephemeral HTTP discovery (requires Node)
-just run --help # Run the existing Release binary without rebuilding
-```
-
-`scripts/test-mcp.mjs` runs the server with an isolated HOME/XDG environment, no external CLI PATH or credentials, and Bugsink disabled; it never opens production databases, invokes tools, or starts/connects to the daemon. The repository-root Linux/macOS workflow is also configured for Go tests/build. CI configuration requires the tested full `VCPKG_REF` commit variable. Current July HTTP builds require matching local slimr/libhv overlays until a corresponding registry release is published. Linux execution and remote merge-gate enforcement are not claimed by local macOS verification.
+`scripts/test-mcp.ts` runs the server against a scratch `WHATSAPP_CLIENT_DATA_DIR` with Bugsink disabled; it never opens production databases, invokes tools, or starts/connects to the daemon.
