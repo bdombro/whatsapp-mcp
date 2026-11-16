@@ -31,24 +31,21 @@ if [ -z "${VCPKG_ROOT:-}" ] || [ ! -x "$VCPKG_ROOT/vcpkg" ]; then
 fi
 
 os="$(uname -s)"
-compiler="${CXX:-}"
-if [ -z "$compiler" ]; then
-    if [ "$os" = "Darwin" ]; then
-        compiler="/usr/bin/clang++"
-    else
-        compiler="${llvm_bin}/clang++"
-    fi
-fi
-
-cxx_flags=(-std=c++26)
-if [ "$os" = "Linux" ]; then
-    cxx_flags+=(-stdlib=libc++)
-fi
+compiler="${CXX:-${llvm_bin}/clang++}"
+cxx_flags=(-std=c++26 -stdlib=libc++)
 
 if ! command -v "$compiler" >/dev/null 2>&1 && [ ! -x "$compiler" ]; then
-    fail "C++ compiler not found: $compiler" "Install Xcode Command Line Tools (macOS) or brew install llvm@23 (Linux)"
+    fail "C++ compiler not found: $compiler" "brew install llvm@23"
 elif ! printf '#include <expected>\nint main() { return 0; }\n' | "$compiler" "${cxx_flags[@]}" -x c++ - -o /dev/null 2>/dev/null; then
-    fail "Compiler $compiler failed C++26 check (${cxx_flags[*]})" "Upgrade Xcode Command Line Tools (macOS) or brew install llvm@23 (Linux)"
+    fail "Compiler $compiler failed C++26 check (${cxx_flags[*]})" "brew install llvm@23"
+fi
+
+if [ "$os" = "Darwin" ] && { command -v "$compiler" >/dev/null 2>&1 || [ -x "$compiler" ]; }; then
+    libcxx_a="$("$compiler" -print-file-name=c++/libc++.a 2>/dev/null || true)"
+    libcxx_dir="$(dirname "$libcxx_a")"
+    if [ -z "$libcxx_a" ] || [ ! -f "$libcxx_a" ] || [ ! -f "$libcxx_dir/libc++abi.a" ]; then
+        fail "Missing static libc++.a / libc++abi.a for $compiler" "brew install llvm@23"
+    fi
 fi
 
 if [ "$os" = "Linux" ]; then

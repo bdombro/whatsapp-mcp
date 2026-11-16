@@ -102,7 +102,7 @@ at it) is a deliberate operator step with every daemon stopped.
 
 Prerequisites (`just doctor` checks them, plus Go):
 
-- **macOS:** Xcode Command Line Tools (`/usr/bin/clang++` with C++26 + libc++ FAST hardening), Homebrew `llvm@23`, `cmake`, `ninja`, `just`, `bun`, `gh`, `jq`, `go` (per `client/go.mod`), and bootstrapped `vcpkg` (`VCPKG_ROOT` set).
+- **macOS:** Homebrew `llvm@23` (`clang`/`clang++` with `-stdlib=libc++`, static `libc++` in Release and vcpkg deps), `cmake`, `ninja`, `just`, `bun`, `gh`, `jq`, `go` (per `client/go.mod`), and bootstrapped `vcpkg` (`VCPKG_ROOT` set).
 - **Linux (`ubuntu-24.04`):** Homebrew on Linux (`llvm@23` provides `clang++` with `-stdlib=libc++`, static libc++ in Release builds), `ninja`, `just`, `bun`, `gh`, `jq`, `go`, bootstrapped `vcpkg`, and `sudo loginctl enable-linger "$USER"` for `brew services`.
 
 Set `LLVM_BIN` to override the `$(brew --prefix llvm@23)/bin` path used by `just fmt` and `just lint`. Set `CXX` before first configure to override the compiler; CMake caches it.

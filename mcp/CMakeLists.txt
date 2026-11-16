@@ -34,6 +34,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_options(app_options INTERFACE -stdlib=libc++)
     target_link_options(app_options INTERFACE -stdlib=libc++ -L${libcxx_dir}
         $<$<CONFIG:Release>:-static-libstdc++> $<$<NOT:$<CONFIG:Release>>:-Wl$<COMMA>-rpath$<COMMA>${libcxx_dir}>)
+elseif(APPLE)
+    execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=c++/libc++.a
+        OUTPUT_VARIABLE libcxx_a OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+    cmake_path(NORMAL_PATH libcxx_a)
+    if(NOT EXISTS "${libcxx_a}")
+        message(FATAL_ERROR "Static libc++.a not found via ${CMAKE_CXX_COMPILER} (got '${libcxx_a}'); use llvm@23")
+    endif()
+    cmake_path(GET libcxx_a PARENT_PATH libcxx_dir)
+    string(APPEND CMAKE_REQUIRED_FLAGS " -stdlib=libc++")
+    list(APPEND CMAKE_REQUIRED_LINK_OPTIONS -nostdlib++ "${libcxx_dir}/libc++.a" "${libcxx_dir}/libc++abi.a")
+    target_compile_options(app_options INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>")
+    target_link_options(app_options INTERFACE
+        -nostdlib++ "${libcxx_dir}/libc++.a" "${libcxx_dir}/libc++abi.a"
+        -Wl,-exported_symbols_list,/dev/null)
 endif()
 target_compile_options(app_options INTERFACE -ftrivial-auto-var-init=zero)
 check_cxx_source_compiles("

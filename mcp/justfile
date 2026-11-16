@@ -11,9 +11,9 @@ check_skip := ".github/** scripts/release.ts scripts/formula-shared.ts scripts/t
 required := "brew bun cmake gh git jq just ninja vcpkg"
 log := `brew --prefix` + "/var/log/" + formula + ".log"
 llvm := env("LLVM_BIN", `brew --prefix llvm@23` + "/bin")
-cxx := env("CXX", if os() == "macos" { "/usr/bin/clang++" } else { llvm + "/clang++" })
+cxx := env("CXX", llvm + "/clang++")
 triplet := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64") + if os() == "macos" { "-osx" } else { "-linux" }
-deps_env := if os() == "linux" { "CC=\"" + llvm + "/clang\" CXX=\"" + cxx + "\" LIBCXX_DIR=\"$(dirname \"$(\"" + cxx + "\" -print-file-name=libc++.so)\")\" " } else { "" }
+deps_env := "CC=\"" + llvm + "/clang\" CXX=\"" + cxx + "\" LIBCXX_DIR=\"$(dirname \"$(\"" + cxx + "\" -print-file-name=" + (if os() == "macos" { "c++/libc++.a" } else { "libc++.so" }) + ")\")\" "
 discover := '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 
 _:
@@ -37,7 +37,7 @@ clean:
 
 # Configure CMake (Debug enables ASan + UBSan)
 configure configuration="Debug": deps
-    CXX="{{ cxx }}" cmake -S . -B build/cmake/{{ configuration }} -G Ninja -DCMAKE_BUILD_TYPE={{ configuration }} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR="{{ justfile_directory() }}/build/deps" -DVCPKG_TARGET_TRIPLET={{ triplet }} -DENABLE_SANITIZERS={{ if configuration == "Debug" { "ON" } else { "OFF" } }}
+    CC="{{ llvm }}/clang" CXX="{{ cxx }}" cmake -S . -B build/cmake/{{ configuration }} -G Ninja -DCMAKE_BUILD_TYPE={{ configuration }} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR="{{ justfile_directory() }}/build/deps" -DVCPKG_TARGET_TRIPLET={{ triplet }} -DENABLE_SANITIZERS={{ if configuration == "Debug" { "ON" } else { "OFF" } }}
 
 # Install vcpkg dependencies into build/deps
 deps:

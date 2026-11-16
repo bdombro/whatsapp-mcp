@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Internal: switch macOS build to llvm@23 with static libc++
+
 ## v3.0.0 - 2026-11-16
 
 - OAuth authorization endpoints and pairing pages only accept loopback connections (403 from LAN peers)
