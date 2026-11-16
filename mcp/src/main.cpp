@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 
     auto app = whatsapp::make_whatsapp_app();
 
-    std::string host = "127.0.0.1";
+    std::string host = "0.0.0.0";
     int port = 10008;
     for (size_t i = 2; i < filteredArgv.size(); ++i) {
         std::string_view arg = filteredArgv[i];
@@ -88,12 +88,17 @@ int main(int argc, char **argv) {
     }
 
     slimr::HttpServerOptions httpOpts;
-    httpOpts.host = "127.0.0.1";
+    httpOpts.host = "0.0.0.0";
     httpOpts.port = 10008;
 
     const std::string dataDir = whatsapp::resolve_data_dir();
     const std::string sockPath = whatsapp::resolve_socket_path(dataDir);
-    const std::string baseUrl = "http://" + host + ":" + std::to_string(port > 0 ? port : 10008);
+    // OAuth metadata advertises loopback when bound to all interfaces
+    const std::string publicHost = (host.empty() || host == "0.0.0.0") ? "127.0.0.1" : host;
+    const std::string baseUrl = "http://" + publicHost + ":" + std::to_string(port > 0 ? port : 10008);
+    if (port > 0) {
+        httpOpts.publicBaseUrl = baseUrl;
+    }
 
     auto oauthAs = whatsapp::configure_whatsapp_http_oauth(
         httpOpts,

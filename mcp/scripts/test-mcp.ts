@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
@@ -218,10 +219,95 @@ async function testHttpOAuthSmoke(tmpDir: string): Promise<void> {
   console.log("PASS http (401 + WWW-Authenticate, RFC 9728, RFC 8414, DCR, SIGTERM exit 0)");
 }
 
+async function freePort(): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once("error", reject);
+    srv.listen(0, "0.0.0.0", () => {
+      const port = (srv.address() as net.AddressInfo).port;
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+async function stopServer(proc: ReturnType<typeof spawn>): Promise<number> {
+  return await new Promise<number>((resolve) => {
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve(-1);
+    }, 3000);
+    proc.once("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code ?? 0);
+    });
+    proc.kill("SIGTERM");
+  });
+}
+
+// Default bind is 0.0.0.0; OAuth metadata must still advertise 127.0.0.1
+async function testHttpDefaultBind(tmpDir: string): Promise<void> {
+  const port = await freePort();
+  const proc = spawn(binPath, ["http", "--port", String(port)], {
+    env: makeIsolatedEnv(tmpDir),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  let logs = "";
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timed out waiting for HTTP listener. Logs:\n${logs}`));
+    }, 5000);
+    const onData = (chunk: Buffer) => {
+      logs += chunk.toString();
+      if (logs.includes(`:${port}/mcp`)) {
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+    proc.stdout!.on("data", onData);
+    proc.stderr!.on("data", onData);
+    proc.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`HTTP server exited early (${code}). Logs:\n${logs}`));
+    });
+  });
+
+  try {
+    const prmResp = await fetch(`${baseUrl}/.well-known/oauth-protected-resource`);
+    assert.equal(prmResp.status, 200);
+    const prm: any = await prmResp.json();
+    assert.equal(prm.resource, `${baseUrl}/mcp`);
+    assert.equal(prm.authorization_servers[0], baseUrl);
+
+    const asResp = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
+    assert.equal(asResp.status, 200);
+    const asMeta: any = await asResp.json();
+    assert.equal(asMeta.issuer, baseUrl);
+
+    // Reachable on a non-loopback interface, still advertising 127.0.0.1
+    const lanIp = Object.values(os.networkInterfaces())
+      .flat()
+      .find((a) => a && a.family === "IPv4" && !a.internal)?.address;
+    if (lanIp) {
+      const lanResp = await fetch(`http://${lanIp}:${port}/.well-known/oauth-protected-resource`);
+      assert.equal(lanResp.status, 200);
+      const lanPrm: any = await lanResp.json();
+      assert.equal(lanPrm.resource, `${baseUrl}/mcp`);
+    } else {
+      console.log("SKIP non-loopback reachability (no non-internal IPv4 interface)");
+    }
+  } finally {
+    assert.equal(await stopServer(proc), 0);
+  }
+  console.log("PASS http default bind (0.0.0.0, metadata advertises 127.0.0.1)");
+}
+
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "whatsapp-mcp-smoke-"));
 try {
   await testStdio(tmpDir);
   await testHttpOAuthSmoke(tmpDir);
+  await testHttpDefaultBind(tmpDir);
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
