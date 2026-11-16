@@ -2,20 +2,37 @@ class WhatsappClient < Formula
   desc "WhatsApp sync daemon and CLI backed by whatsmeow"
   homepage "https://github.com/bdombro/whatsapp-mcp"
   version "2.0.0"
-  license "MIT"
 
-  url "https://github.com/bdombro/whatsapp-mcp/releases/download/v2.0.0/whatsapp-client-v2.0.0-darwin-arm64.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  on_macos do
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v2.0.0/whatsapp-client-arm64-macos.tar.gz"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  end
+
+  on_linux do
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v2.0.0/whatsapp-client-x64-linux.tar.gz"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  end
+
+  license "MIT"
 
   def install
     bin.install "whatsapp-client"
+    chmod 0755, bin/"whatsapp-client"
+  end
+
+  def post_install
+    (var/"whatsapp-client").mkpath
+    chmod 0700, var/"whatsapp-client"
+    (var/"log").mkpath
   end
 
   service do
-    run [opt_bin/"whatsapp-client", "daemon", "--log-file", var/"log/whatsapp-client.log"]
+    run ["/bin/sh", "-c", "[ -f #{etc}/whatsapp-client/env ] && set -a && . #{etc}/whatsapp-client/env; exec #{opt_bin}/whatsapp-client daemon --log-file #{var}/log/whatsapp-client.log"]
     keep_alive true
+    working_dir var/"whatsapp-client"
     log_path var/"log/whatsapp-client.log"
     error_log_path var/"log/whatsapp-client.log"
+    environment_variables PATH: "#{HOMEBREW_PREFIX}/bin:/usr/bin:/bin"
   end
 
   def caveats
