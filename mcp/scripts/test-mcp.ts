@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -294,13 +295,39 @@ async function testHttpDefaultBind(tmpDir: string): Promise<void> {
       assert.equal(lanResp.status, 200);
       const lanPrm: any = await lanResp.json();
       assert.equal(lanPrm.resource, `${baseUrl}/mcp`);
+
+      // /mcp stays Bearer-protected; AS endpoints refuse non-loopback peers even with a spoofed Host
+      const lanRequest = (method: string, urlPath: string, headers: Record<string, string> = {}, body = "") =>
+        new Promise<number>((resolve, reject) => {
+          const req = http.request({ host: lanIp, port, method, path: urlPath, headers }, (res) => {
+            res.resume();
+            res.on("end", () => resolve(res.statusCode ?? 0));
+          });
+          req.on("error", reject);
+          req.end(body);
+        });
+      const jsonHeaders = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
+      assert.equal(
+        await lanRequest("POST", "/mcp", jsonHeaders, '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}'),
+        401,
+      );
+      const authorizeQuery =
+        "/authorize?response_type=code&client_id=x&redirect_uri=http%3A%2F%2F127.0.0.1%3A49152%2Fcb" +
+        "&code_challenge=abc&code_challenge_method=S256&state=s";
+      const registerBody = '{"client_name":"lan","redirect_uris":["http://127.0.0.1:49152/cb"]}';
+      for (const host of [undefined, `127.0.0.1:${port}`]) {
+        const hostHeader: Record<string, string> = host ? { Host: host } : {};
+        assert.equal(await lanRequest("GET", "/.well-known/oauth-authorization-server", hostHeader), 403);
+        assert.equal(await lanRequest("POST", "/register", { ...hostHeader, "Content-Type": "application/json" }, registerBody), 403);
+        assert.equal(await lanRequest("GET", authorizeQuery, hostHeader), 403);
+      }
     } else {
       console.log("SKIP non-loopback reachability (no non-internal IPv4 interface)");
     }
   } finally {
     assert.equal(await stopServer(proc), 0);
   }
-  console.log("PASS http default bind (0.0.0.0, metadata advertises 127.0.0.1)");
+  console.log("PASS http default bind (0.0.0.0, metadata advertises 127.0.0.1, AS loopback-only)");
 }
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "whatsapp-mcp-smoke-"));

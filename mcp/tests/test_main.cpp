@@ -689,6 +689,52 @@ TEST_CASE("version and Bugsink release come from VERSION") {
     CHECK(status["version"].get_string() == WHATSAPP_APP_VERSION);
 }
 
+TEST_CASE("OAuth AS routes accept loopback peers only") {
+    using oauth_detail::is_loopback_peer;
+    CHECK(is_loopback_peer("127.0.0.1:50000"));
+    CHECK(is_loopback_peer("127.8.9.10:1"));
+    CHECK(is_loopback_peer("::1:50000"));
+    CHECK(is_loopback_peer("[::1]:50000"));
+    CHECK(is_loopback_peer("::ffff:127.0.0.1:50000"));
+    CHECK_FALSE(is_loopback_peer("192.168.1.20:50000"));
+    CHECK_FALSE(is_loopback_peer("10.0.0.1:50000"));
+    CHECK_FALSE(is_loopback_peer("128.0.0.1:50000"));
+    CHECK_FALSE(is_loopback_peer("::ffff:192.168.1.20:50000"));
+    CHECK_FALSE(is_loopback_peer("fe80::1:50000"));
+    CHECK_FALSE(is_loopback_peer("0.0.0.0:50000"));
+    CHECK_FALSE(is_loopback_peer(""));
+    CHECK_FALSE(is_loopback_peer("127.0.0.1"));
+    CHECK_FALSE(is_loopback_peer("127.0.0.1:"));
+    CHECK_FALSE(is_loopback_peer(":50000"));
+    CHECK_FALSE(is_loopback_peer("localhost:50000"));
+    CHECK_FALSE(is_loopback_peer("127.0.0.1x:50000"));
+    CHECK_FALSE(is_loopback_peer("127.0.0.1:50000x"));
+
+    OAuthAsServer as(OAuthAsConfig{.defaultBaseUrl = "http://127.0.0.1:10008"});
+    const auto routes = as.routes(/*includeProtectedResourceMetadata=*/true);
+    REQUIRE(routes.size() == 9);
+    for (const auto &route : routes) {
+        INFO(route.method << " " << route.path);
+        slimr::HttpRouteRequest req;
+        req.method = route.method;
+        req.path = route.path;
+        req.headers["host"] = "127.0.0.1:10008";
+        req.headers["x-forwarded-for"] = "127.0.0.1";
+        req.remoteAddr = "192.168.1.20:50000";
+        const auto lan = route.handler(req);
+        if (route.path == "/.well-known/oauth-protected-resource") {
+            CHECK(lan.status == 200);
+            continue;
+        }
+        CHECK(lan.status == 403);
+        CHECK(parse_json_ok(lan.body)["error"].get_string() == "forbidden");
+        req.remoteAddr = "";
+        CHECK(route.handler(req).status == 403);
+        req.remoteAddr = "127.0.0.1:50000";
+        CHECK(route.handler(req).body.find("only accept loopback") == std::string::npos);
+    }
+}
+
 // ---------------- QR SVG Tests ----------------
 
 TEST_CASE("qr_to_svg encoding and structure") {

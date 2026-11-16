@@ -7,6 +7,8 @@
 #include "mcp_http.hpp"
 #include "mcp_oauth.hpp"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -118,6 +120,35 @@ inline std::string ascii_lower(std::string_view s) {
         ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
     }
     return out;
+}
+
+// True only when the connection peer ("ip:port" from slimr) is 127.0.0.0/8, ::1 or ::ffff:127.x.x.x
+inline bool is_loopback_peer(std::string_view remoteAddr) noexcept {
+    const size_t colon = remoteAddr.rfind(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 == remoteAddr.size())
+        return false;
+    for (char c : remoteAddr.substr(colon + 1)) {
+        if (c < '0' || c > '9')
+            return false;
+    }
+    std::string_view host = remoteAddr.substr(0, colon);
+    if (host.size() >= 2 && host.front() == '[' && host.back() == ']')
+        host = host.substr(1, host.size() - 2);
+    if (host.empty() || host.size() >= INET6_ADDRSTRLEN)
+        return false;
+
+    std::array<char, INET6_ADDRSTRLEN> buf{};
+    host.copy(buf.data(), host.size());
+    in_addr v4{};
+    if (inet_pton(AF_INET, buf.data(), &v4) == 1)
+        return (ntohl(v4.s_addr) >> 24) == 127;
+    in6_addr v6{};
+    if (inet_pton(AF_INET6, buf.data(), &v6) == 1) {
+        if (IN6_IS_ADDR_LOOPBACK(&v6))
+            return true;
+        return IN6_IS_ADDR_V4MAPPED(&v6) && v6.s6_addr[12] == 127;
+    }
+    return false;
 }
 
 inline bool has_control_chars(std::string_view s) noexcept {
@@ -537,6 +568,16 @@ class OAuthAsServer {
             .enforceSameOrigin = true,
             .handler = [this](const slimr::HttpRouteRequest &req) { return handleRevoke(req); }});
 
+        // AS endpoints and pairing pages accept loopback peers only; the PRM stays public
+        for (auto &route : out) {
+            if (route.path == "/.well-known/oauth-protected-resource")
+                continue;
+            route.handler = [inner = std::move(route.handler)](const slimr::HttpRouteRequest &req) {
+                if (!oauth_detail::is_loopback_peer(req.remoteAddr))
+                    return jsonError(403, "forbidden", "OAuth endpoints only accept loopback connections");
+                return inner(req);
+            };
+        }
         return out;
     }
 
