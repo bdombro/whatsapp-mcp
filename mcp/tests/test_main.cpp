@@ -640,6 +640,29 @@ inline void seed_test_messages_db(const std::filesystem::path &dbPath) {
 
 } // namespace
 
+TEST_CASE("data dir resolution") {
+    ScopedEnvVar prefix("HOMEBREW_PREFIX", "/brew/prefix/");
+    ScopedEnvVar clientDir("WHATSAPP_CLIENT_DATA_DIR", "");
+    ScopedEnvVar mcpDir("WHATSAPP_MCP_DATA_DIR", "");
+
+    SUBCASE("defaults to the Homebrew var dir") {
+        CHECK(resolve_data_dir() == "/brew/prefix/var/whatsapp-client");
+        CHECK(resolve_socket_path(resolve_data_dir()) == "/brew/prefix/var/whatsapp-client/daemon.sock");
+    }
+
+    SUBCASE("WHATSAPP_MCP_DATA_DIR overrides the default") {
+        ScopedEnvVar mcp("WHATSAPP_MCP_DATA_DIR", "/data/mcp");
+        CHECK(resolve_data_dir() == "/data/mcp");
+    }
+
+    SUBCASE("WHATSAPP_CLIENT_DATA_DIR wins over WHATSAPP_MCP_DATA_DIR") {
+        ScopedEnvVar mcp("WHATSAPP_MCP_DATA_DIR", "/data/mcp");
+        ScopedEnvVar client("WHATSAPP_CLIENT_DATA_DIR", "/data/client");
+        CHECK(resolve_data_dir() == "/data/client");
+        CHECK(resolve_socket_path(resolve_data_dir()) == "/data/client/daemon.sock");
+    }
+}
+
 // ---------------- QR SVG Tests ----------------
 
 TEST_CASE("qr_to_svg encoding and structure") {

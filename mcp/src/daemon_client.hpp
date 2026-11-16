@@ -1,5 +1,6 @@
 #pragma once
 
+#include "brew_prefix.hpp"
 #include "curl.hpp"
 #include "json.hpp"
 
@@ -19,37 +20,11 @@ inline std::string resolve_data_dir() {
     if (mcpEnv && mcpEnv[0] != '\0')
         return mcpEnv;
 
-    const char *home = std::getenv("HOME");
-    std::string homeDir = home ? home : ".";
-    std::string clientDir = homeDir + "/.local/share/whatsapp-client";
-    std::string mcpDir = homeDir + "/.local/share/whatsapp-mcp";
-
-    if (std::filesystem::exists(clientDir)) {
-        return clientDir;
-    }
-    if (std::filesystem::exists(mcpDir)) {
-        return mcpDir;
-    }
-    return clientDir;
+    return brew_prefix() + "/var/whatsapp-client";
 }
 
 inline std::string resolve_socket_path(const std::string &dataDir) {
-    std::string sock = dataDir + "/daemon.sock";
-    if (std::filesystem::exists(sock)) {
-        return sock;
-    }
-
-    const char *home = std::getenv("HOME");
-    std::string homeDir = home ? home : ".";
-    std::string clientSock = homeDir + "/.local/share/whatsapp-client/daemon.sock";
-    if (std::filesystem::exists(clientSock)) {
-        return clientSock;
-    }
-    std::string mcpSock = homeDir + "/.local/share/whatsapp-mcp/daemon.sock";
-    if (std::filesystem::exists(mcpSock)) {
-        return mcpSock;
-    }
-    return sock;
+    return dataDir + "/daemon.sock";
 }
 
 struct SendResult {
