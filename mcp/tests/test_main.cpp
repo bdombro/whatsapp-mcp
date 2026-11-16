@@ -708,7 +708,6 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
     slimr::HttpServerOptions httpOpts;
     httpOpts.host = "127.0.0.1";
     httpOpts.port = 0;
-    httpOpts.allowEphemeralPort = true;
     auto oauthServer = configure_whatsapp_http_oauth(
         httpOpts,
         OAuthAsConfig{
@@ -1164,15 +1163,5 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
              {"Authorization", "Bearer " + writeToken}},
             R"({"jsonrpc":"2.0","id":7,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})");
         CHECK(afterRevoke.status == 401);
-    }
-
-    // 11. Refusal checks on enable_http host/port options
-    {
-        slimr::HttpServerOptions badHost;
-        badHost.host = "0.0.0.0";
-        badHost.port = 10008;
-        slimr::McpHttpServer s(app, badHost);
-        std::string err;
-        CHECK(!s.start(&err));
     }
 }

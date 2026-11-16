@@ -1,14 +1,65 @@
 {
   "default-registry": {
     "kind": "builtin",
-    "baseline": "5cad485d1ddb649c8fa1022bf0b3908555e6e6ba"
+    "baseline": "8f363bdc11359ede4bc51e5eb32a2617538049c8"
   },
   "registries": [
     {
       "kind": "git",
-      "repository": "https://github.com/bdombro/slimr-cpp.git",
-      "baseline": "91b48cf91739dc622f97c6dd8f0c0f54c367ce43",
-      "packages": ["slimr-*"]
+      "baseline": "53a3b58d03fb2da1c946cfe1d06fde9a57b35ff3",
+      "repository": "https://github.com/bdombro/slimr-mcp.git",
+      "packages": [
+        "slimr-mcp",
+        "libhv"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "5ea70c32f5d3f7069a67fdea2733a78c356be1df",
+      "repository": "https://github.com/bdombro/slimr-sqlite.git",
+      "packages": [
+        "slimr-sqlite"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "6b5d99b91c631687aeca740ea0848d471418015c",
+      "repository": "https://github.com/bdombro/slimr-test.git",
+      "packages": [
+        "slimr-test"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "d21bdc0f61e052053c76b95e57eb230910027006",
+      "repository": "https://github.com/bdombro/slimr-json.git",
+      "packages": [
+        "slimr-json"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "9ede15a1560fd6ed17b2b8e397c7aac97f4c63c3",
+      "repository": "https://github.com/bdombro/slimr-reflect.git",
+      "packages": [
+        "slimr-reflect"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "96e8d252fe8993ab59e871d45b5ca08afff83f08",
+      "repository": "https://github.com/bdombro/slimr-bugsink.git",
+      "packages": [
+        "slimr-bugsink"
+      ]
+    },
+    {
+      "kind": "git",
+      "baseline": "2e64d6b432cf9af8499c2e773015a3957b22c395",
+      "repository": "https://github.com/bdombro/slimr-curl.git",
+      "packages": [
+        "slimr-curl"
+      ]
     }
   ]
 }

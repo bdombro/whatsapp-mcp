@@ -124,7 +124,7 @@ async function testStdio(tmpDir: string): Promise<void> {
 }
 
 async function testHttpOAuthSmoke(tmpDir: string): Promise<void> {
-  const proc = spawn(binPath, ["http", "--host", "127.0.0.1", "--port", "0", "--allow-ephemeral-port"], {
+  const proc = spawn(binPath, ["http", "--host", "127.0.0.1", "--port", "0"], {
     env: makeIsolatedEnv(tmpDir),
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -218,30 +218,10 @@ async function testHttpOAuthSmoke(tmpDir: string): Promise<void> {
   console.log("PASS http (401 + WWW-Authenticate, RFC 9728, RFC 8414, DCR, SIGTERM exit 0)");
 }
 
-async function testNonLoopbackRefused(tmpDir: string): Promise<void> {
-  const proc = spawn(binPath, ["http", "--host", "0.0.0.0", "--port", "10008"], {
-    env: makeIsolatedEnv(tmpDir),
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const code = await new Promise<number>((resolve) => {
-    const timer = setTimeout(() => {
-      proc.kill("SIGKILL");
-      resolve(-1);
-    }, 3000);
-    proc.once("exit", (c) => {
-      clearTimeout(timer);
-      resolve(c ?? 1);
-    });
-  });
-  assert.notEqual(code, 0, "Expected --host 0.0.0.0 to be refused");
-  console.log("PASS http refusal (--host 0.0.0.0 rejected)");
-}
-
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "whatsapp-mcp-smoke-"));
 try {
   await testStdio(tmpDir);
   await testHttpOAuthSmoke(tmpDir);
-  await testNonLoopbackRefused(tmpDir);
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }

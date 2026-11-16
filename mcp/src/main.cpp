@@ -28,8 +28,6 @@ int main(int argc, char **argv) {
     slimr::HttpServerOptions httpOpts;
     httpOpts.host = "127.0.0.1";
     httpOpts.port = 10008;
-    httpOpts.allowEphemeralPort = false;
-    httpOpts.allowNonLoopback = false;
 
     const std::string dataDir = whatsapp::resolve_data_dir();
     const std::string sockPath = whatsapp::resolve_socket_path(dataDir);
