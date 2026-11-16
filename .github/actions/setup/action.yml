@@ -71,4 +71,6 @@ runs:
       with:
         path: ${{ runner.temp }}/vcpkg-cache
         key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-${{ hashFiles('mcp/vcpkg*.json') }}
-        restore-keys: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-
+          vcpkg-${{ runner.os }}-${{ runner.arch }}-
