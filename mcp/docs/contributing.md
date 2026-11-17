@@ -142,41 +142,18 @@ gh api /repos/<owner>/<repo>/rulesets
 
 ### 4. Act as the App (emergency fix or manual release step)
 
-Mint a short-lived JWT (`RS256`, `iat` = now - 60s, `exp` = now + 540s, `iss` = `<app-id>`), exchange it for a 1-hour installation token, and keep all credentials in shell variables only (never echo, log, or commit them):
+Use [`scripts/release-bot`](https://github.com/slimr-down-now/cpp-templates/blob/main/scripts/release-bot) with `RELEASE_APP_ID` and `RELEASE_APP_KEY` set (under the hood it signs a short-lived `RS256` App JWT, exchanges it for an installation token, and revokes the token on exit):
 
 ```sh
-app_id=<app-id>
-pem=~/.ssh/<app-name>.private-key.pem
-b64url() { openssl base64 -e -A | tr '+/' '-_' | tr -d '='; }
-now=$(date +%s)
-header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)
-payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "$app_id" | b64url)
-sig=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign "$pem" | b64url)
-jwt="${header}.${payload}.${sig}"
+export RELEASE_APP_ID=<app-id>
+export RELEASE_APP_KEY=~/.ssh/<app-name>.private-key.pem
 
-inst_id=$(curl -fsSL -H "Authorization: Bearer $jwt" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/<owner>/<repo>/installation" | jq -r .id)
-token=$(curl -fsSL -X POST -H "Authorization: Bearer $jwt" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/app/installations/${inst_id}/access_tokens" | jq -r .token)
+release-bot push-main                  # push HEAD to origin main as the App
+release-bot gh release create ...      # run one gh command with GH_TOKEN set
+release-bot shell                      # subshell with GH_TOKEN; revokes on exit
 ```
 
-Use `$token` with `gh` or `git push`, committing as the App's bot identity (`gh api /users/<app-slug>%5Bbot%5D --jq .id` gives `<bot-user-id>`):
-
-```sh
-git -c user.name="<app-slug>[bot]" \
-    -c user.email="<bot-user-id>+<app-slug>[bot]@users.noreply.github.com" \
-    commit -m "fix: ..."
-git push "https://x-access-token:${token}@github.com/<owner>/<repo>.git" HEAD:main
-GH_TOKEN="$token" gh release create ...
-```
-
-Tokens expire after 1 hour; revoke early when done:
-
-```sh
-curl -fsSL -X DELETE -H "Authorization: Bearer $token" -H "Accept: application/vnd.github+json" \
-  https://api.github.com/installation/token
-unset jwt token
-```
+Flags before the subcommand: `--owner <owner>` (token scope; defaults to `origin` owner) and `--repo <owner>/<repo>` (`push-main` target; defaults to `origin`).
 
 ## Dependency bumps
 

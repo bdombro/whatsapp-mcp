@@ -42,21 +42,21 @@ with implemented behavior; do not claim unverified release or client support.
 
 ## Build Architecture
 
-`mcp/` is checked against the cpp-templates `homebrew-mcp` template (`just check homebrew-mcp plugins/whatsapp-mcp/mcp` from the workspace). The root justfile, root `.github/`, `scripts/{release,formula-shared}.ts`, `Formula/`, `VERSION`, `CHANGELOG.md` and Go `client/` stay repo-owned: the root delegates to `client/` and `mcp/`, and its `daemon-*`, `install` and `uninstall` recipes act on both formulas. Apps read `$(brew --prefix)/var/whatsapp-client` (or `WHATSAPP_CLIENT_DATA_DIR`) and never migrate data. Keep LaunchAgent and brew service deployment separate from portable tests; never start a daemon or service during validation.
+`mcp/` is aligned to the cpp-templates `homebrew-mcp` template via the `cpp-templates` skill (`mcp/AGENTS.md` marker). The root justfile, root `.github/`, `scripts/{release,formula-shared}.ts`, `Formula/`, `VERSION`, `CHANGELOG.md` and Go `client/` stay repo-owned: the root delegates to `client/` and `mcp/`, and its `daemon-*`, `install` and `uninstall` recipes act on both formulas. Apps read `$(brew --prefix)/var/whatsapp-client` (or `WHATSAPP_CLIENT_DATA_DIR`) and never migrate data. Keep LaunchAgent and brew service deployment separate from portable tests; never start a daemon or service during validation.
 
 <!-- cpp-templates:begin -->
+<!-- cpp-templates:commit c746b02c9f5b17b63c4921e6adff7fa8c5f6dc37 -->
 ## Contributing
 
 Read the sections of [docs/contributing.md](docs/contributing.md) relevant to your change before editing.
 
 ## Tooling alignment
 
-Align this repository via the `cpp-templates` skill (`just check <template> .`). Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`. Do not hand-edit verbatim template files or template recipes (repositories may add extra recipes or variables).
+Align this repository via the `cpp-templates` skill, which diffs `base/` and `templates/<template>/` since the `<!-- cpp-templates:commit <sha> -->` marker above and adapts changes while preserving repository customizations. Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`.
 
 ## Edit-don't-rewrite
 
 - Make targeted edits and move files with `git mv`; never regenerate files from scratch or retype them from memory.
-- Template files arrive through `just new` or `just sync`.
 - Never delete, skip, or loosen tests to pass; if a test must change, explain why in the commit message.
 
 ## C++ Memory Safety

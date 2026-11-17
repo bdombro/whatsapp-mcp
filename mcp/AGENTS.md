@@ -43,18 +43,18 @@ Install and `daemon-*` live in the repository-root justfile (two formulas); rele
 CMake declares targets/dependencies; Ninja owns incremental builds. Dependencies resolve from the pinned `slimr-*` registries in `vcpkg-configuration.json` (no overlays) and install under `build/deps/`; Debug sanitizer and Release trees live under `build/cmake/`. SQLite is statically linked with FTS5. `test-mcp` checks July discovery over ephemeral HTTP (OAuth-protected) with Bun against a scratch data dir; it does not call tools, open user databases, or connect to/start the daemon.
 
 <!-- cpp-templates:begin -->
+<!-- cpp-templates:commit c746b02c9f5b17b63c4921e6adff7fa8c5f6dc37 -->
 ## Contributing
 
 Read the sections of [docs/contributing.md](docs/contributing.md) relevant to your change before editing.
 
 ## Tooling alignment
 
-Align this repository via the `cpp-templates` skill (`just check <template> .`). Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`. Do not hand-edit verbatim template files or template recipes (repositories may add extra recipes or variables).
+Align this repository via the `cpp-templates` skill, which diffs `base/` and `templates/<template>/` since the `<!-- cpp-templates:commit <sha> -->` marker above and adapts changes while preserving repository customizations. Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`.
 
 ## Edit-don't-rewrite
 
 - Make targeted edits and move files with `git mv`; never regenerate files from scratch or retype them from memory.
-- Template files arrive through `just new` or `just sync`.
 - Never delete, skip, or loosen tests to pass; if a test must change, explain why in the commit message.
 
 ## C++ Memory Safety
