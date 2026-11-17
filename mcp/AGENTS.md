@@ -1,8 +1,8 @@
 # AGENTS.md (`whatsapp-mcp/mcp`)
 
-Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server and CLI.
+Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server.
 
-`whatsapp-mcp/mcp` is a standalone C++26 application built on the `slimr-*` libraries (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) and CLI commands against `$(brew --prefix)/var/whatsapp-client/messages.db` and `daemon.sock` (`WHATSAPP_CLIENT_DATA_DIR` overrides).
+`whatsapp-mcp/mcp` is a standalone C++26 application built on the `slimr-*` libraries (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) over `/mcp` and `/tools/<name>` against `$(brew --prefix)/var/whatsapp-client/messages.db` and `daemon.sock` (`WHATSAPP_CLIENT_DATA_DIR` overrides).
 
 Over Streamable HTTP (`whatsapp-mcp http`, default `127.0.0.1:10008`; OAuth `publicBaseUrl` stays `127.0.0.1`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
 

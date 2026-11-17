@@ -127,7 +127,7 @@ databases and socket.
 | `…/whatsapp.db` | `0600` | `whatsmeow` device session, Signal keys, contact names (`whatsmeow_contacts`), and LID mappings (`whatsmeow_lid_map`) |
 | `…/messages.db` | `0600` | Synced chats, messages, group participants, and `messages_fts` FTS5 index (WAL mode) |
 | `…/daemon.sock` | `0600` | Unix domain socket for `/api/send` and `/api/download` |
-| `…/mcp-audit.log` | `0600` | Append-only audit log of every MCP/CLI tool invocation |
+| `…/mcp-audit.log` | `0600` | Append-only audit log of every MCP and `/tools/*` tool invocation |
 | `…/config.json` | `0600` | Optional MCP policy overrides (`read_only`, `disabled_tools`, `mutating_tools_per_min`, `whatsapp_send_max_runes`) |
 | `…/downloads/` | `0700` | Media files downloaded by `download_media` |
 

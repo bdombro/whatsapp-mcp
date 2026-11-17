@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Drop per-tool CLI from `whatsapp-mcp` (server-only `http` mode); move HTTP tool routes and OpenAPI spec from root (`/openapi.json`, `/<tool>`) to `/tools/<tool>` and `/tools/openapi.json` (on by default) with `/mcp` OAuth audience parity
+
 ## v3.1.1 - 2026-11-17
 
 - Default HTTP bind to `127.0.0.1:10008` (pass `--host 0.0.0.0` to expose on all interfaces)

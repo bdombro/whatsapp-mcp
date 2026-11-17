@@ -24,10 +24,6 @@ int main(int argc, char **argv) {
             if (arg == nullptr)
                 continue;
             std::string_view sv(arg);
-            if (!sv.empty() && sv.front() == '{') {
-                filteredArgv.push_back(argv[i]);
-                continue;
-            }
             if (sv == "--log-file") {
                 if (i + 1 >= argc || argv[i + 1] == nullptr || argv[i + 1][0] == '\0') {
                     std::cerr << "Missing path for --log-file\n";

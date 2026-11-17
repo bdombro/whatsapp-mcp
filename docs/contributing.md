@@ -169,7 +169,7 @@ Bump a library baseline in `vcpkg-configuration.json` only when a bug fix, new A
 
 ## App Architecture
 
-The `client/` is a Go daemon using `whatsmeow`; the stateless `mcp/` server and JSON CLI are implemented in C++26 on the `slimr-*` libraries.
+The `client/` is a Go daemon using `whatsmeow`; the stateless `mcp/` server is implemented in C++26 on the `slimr-*` libraries.
 
 ```text
 plugins/whatsapp-mcp/
@@ -190,7 +190,7 @@ plugins/whatsapp-mcp/
 │   ├── daemon.go, system.go  # LaunchAgent (`com.bdombro.whatsapp-client.plist`) management
 │   ├── core/                 # Data dir/brew prefix, 2FA OTP redaction, log rotation, Bugsink (`sentry-go`)
 │   └── whatsapp/             # `whatsmeow` sync, `messages.db` store, `daemon.sock` (`/api/send`, `/api/download`)
-└── mcp/                      # C++26 MCP server & narrow JSON CLI (`whatsapp-mcp`), aligned to cpp-templates `homebrew-mcp`
+└── mcp/                      # C++26 MCP server (`whatsapp-mcp`), aligned to cpp-templates `homebrew-mcp`
     ├── vcpkg.json            # Dependencies (slimr-mcp[http], slimr-sqlite, ...) installed under build/deps/
     ├── vcpkg-configuration.json # Pinned vcpkg builtin and slimr-* git registries
     ├── CMakeLists.txt        # App/test targets, VERSION define, hardening, sanitizers
@@ -206,7 +206,7 @@ plugins/whatsapp-mcp/
     │   ├── app.hpp           # `whatsapp::make_whatsapp_app()` registering all 16 tools & Bugsink DSN
     │   ├── oauth_as.hpp      # OAuth 2.1 + PKCE AS & browser QR/approval flow
     │   ├── qr_svg.hpp        # Standalone QR encoder for browser pairing SVG
-    │   └── main.cpp          # Standalone CLI and HTTP/OAuth (`http`) entrypoint
+    │   └── main.cpp          # Standalone HTTP/OAuth (`http`) entrypoint
     └── tests/
         └── test_main.cpp     # ASan + UBSan tests for `wa_utc`, key isolation, FTS5, views, export & allowlist
 ```
@@ -218,7 +218,7 @@ plugins/whatsapp-mcp/
   - `modernc.org/sqlite` — Go SQLite driver for the sync databases.
   - `github.com/getsentry/sentry-go` — Optional PII-scrubbed error reporting via `BUGSINK_DSN` (disabled when unset).
 - **`mcp/` (C++26, `slimr-*`):**
-  - `<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>` — Typed MCP tool definitions, compile-time JSON Schemas, native MCP `image` & `audio` content blocks, and narrow JSON CLI.
+  - `<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>` — Typed MCP tool definitions, compile-time JSON Schemas, native MCP `image` & `audio` content blocks, and HTTP `/tools/<name>` endpoints.
   - `<sqlite.hpp>` (static SQLite with FTS5) — Read-only SQLite connections, custom `wa_utc` scalar function, `TEMP` table/view isolation, and `iterateLimited` (`PRAGMA query_only = ON`).
   - `<httplib.h>` (`cpp-httplib`) — Unix domain socket HTTP calls (`AF_UNIX`) to `daemon.sock`.
   - `<json.hpp>` (`glaze`) — Fast JSON serialization.
@@ -227,7 +227,7 @@ plugins/whatsapp-mcp/
 
 ## `.mcp.json` Configuration
 
-`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `127.0.0.1:10008`, `http://127.0.0.1:10008/mcp`, with OAuth 2.1 + PKCE and a browser QR/approval UI) or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
+`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `127.0.0.1:10008`, `http://127.0.0.1:10008/mcp` plus `/tools/<name>` and `/tools/openapi.json` with OAuth 2.1 + PKCE and a browser QR/approval UI), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
 
 To configure `whatsapp-mcp` over HTTP in `.mcp.json`:
 

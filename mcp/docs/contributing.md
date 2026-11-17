@@ -162,7 +162,7 @@ Bump a library baseline in `vcpkg-configuration.json` only when a bug fix, new A
 
 ## Repository tips
 
-The stateless MCP server and JSON CLI are implemented in C++26 on the `slimr-*` libraries, aligned to the cpp-templates `homebrew-mcp` template. It reads `messages.db` and uses the companion Go `whatsapp-client` only for sends and media downloads.
+The stateless MCP server is implemented in C++26 on the `slimr-*` libraries, aligned to the cpp-templates `homebrew-mcp` template. It reads `messages.db` and uses the companion Go `whatsapp-client` only for sends and media downloads.
 
 ## Cryptographic Session-Key Isolation & SQLite Views
 
@@ -183,20 +183,34 @@ When launched via `whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <p
 - `GET /authorize` + `GET /authorize/qr` + `POST /authorize/approve` + `POST /authorize/cancel` (CSRF-protected browser Connect page; renders live QR SVG when `whatsapp-client` is unpaired, or shows the already-paired JID for explicit owner approval without touching `whatsapp.db`)
 - `POST /token` (authorization code + PKCE `S256` + refresh token rotation with replay family revocation) and `POST /revoke` (revokes MCP access without disconnecting the WhatsApp session)
 
-### CLI Examples
+### HTTP `/tools` Debugging Examples
+
+With the server running (`whatsapp-mcp http`) and an OAuth Bearer token, tools are also reachable directly over HTTP under `/tools/<name>` (on by default):
 
 ```bash
 # Search messages across all chats using FTS5 BM25
-./build/bin/whatsapp-mcp list_messages '{"query":"boiler","limit":10}'
+curl -X POST http://127.0.0.1:10008/tools/list_messages \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"boiler","limit":10}'
 
 # Bulk export messages since a local date
-./build/bin/whatsapp-mcp export '{"since":"2026-11-01"}'
+curl -X POST http://127.0.0.1:10008/tools/export \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"since":"2026-11-01"}'
 
 # Run a read-only SQL query against the isolated views
-./build/bin/whatsapp-mcp sql '{"sql":"SELECT chat_name, COUNT(*) AS n FROM v_messages GROUP BY chat_jid ORDER BY n DESC LIMIT 10"}'
+curl -X POST http://127.0.0.1:10008/tools/sql \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT chat_name, COUNT(*) AS n FROM v_messages GROUP BY chat_jid ORDER BY n DESC LIMIT 10"}'
 
 # Inspect the SQL view schema
-./build/bin/whatsapp-mcp schema
+curl -X POST http://127.0.0.1:10008/tools/schema \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 ## Building & Testing
