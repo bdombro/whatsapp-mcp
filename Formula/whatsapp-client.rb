@@ -1,16 +1,16 @@
 class WhatsappClient < Formula
   desc "WhatsApp sync daemon and CLI backed by whatsmeow"
   homepage "https://github.com/bdombro/whatsapp-mcp"
-  version "3.1.0"
+  version "3.1.1"
 
   on_macos do
-    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.0/whatsapp-client-arm64-macos.tar.gz"
-    sha256 "8776d868327b39977cf35645c380689e085abdbc3bc00ea74dbb90d12385e5d0"
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.1/whatsapp-client-arm64-macos.tar.gz"
+    sha256 "2dd8f9de2df0908715e277a448db24c67baa655eed7926a7f8ac3d75f17e43d6"
   end
 
   on_linux do
-    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.0/whatsapp-client-x64-linux.tar.gz"
-    sha256 "80bf8231c4adfe1aa980ebcdcb9bcdfc7b1f16628e2d239c9079d851cb7d95b7"
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.1/whatsapp-client-x64-linux.tar.gz"
+    sha256 "a0dddc9b0ca23907f570ba98229e63d469fd43d49352f3ad281cc483724e0776"
   end
 
   license "MIT"

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v3.1.1 - 2026-11-17
+
 - Default HTTP bind to `127.0.0.1:10008` (pass `--host 0.0.0.0` to expose on all interfaces)
 - Serve OpenAPI 3.1.0 spec at `GET /openapi.json` and `--openapi` (via `slimr-serve` v0.3.0 and `slimr-mcp` v0.2.1)
 - Internal: pin `slimr-serve` v0.3.0 and `slimr-mcp` v0.2.1, add `/openapi.json` smoke check, and document `overlay-ports` workflow
