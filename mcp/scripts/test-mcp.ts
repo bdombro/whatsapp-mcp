@@ -106,13 +106,25 @@ async function testHttpOAuthSmoke(tmpDir: string): Promise<void> {
     const dcr: any = await dcrResp.json();
     assert.ok(typeof dcr.client_id === "string" && dcr.client_id.length > 0);
 
-    const openApiResp = await fetch(`${baseUrl}/openapi.json`);
+    const rootOpenApiResp = await fetch(`${baseUrl}/openapi.json`);
+    assert.equal(rootOpenApiResp.status, 404);
+
+    if (expectedTools.length > 0) {
+      const rootToolResp = await fetch(`${baseUrl}/${expectedTools[0]}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      assert.equal(rootToolResp.status, 404);
+    }
+
+    const openApiResp = await fetch(`${baseUrl}/tools/openapi.json`);
     assert.equal(openApiResp.status, 200);
     const openApi: any = await openApiResp.json();
     assert.equal(openApi.openapi, "3.1.0");
     assert.equal(openApi.components?.securitySchemes?.bearerAuth?.scheme, "bearer");
     for (const tool of expectedTools) {
-      assert.ok(openApi.paths?.[`/${tool}`]?.post, `Missing POST /${tool} in /openapi.json`);
+      assert.ok(openApi.paths?.[`/tools/${tool}`]?.post, `Missing POST /tools/${tool} in /tools/openapi.json`);
     }
   } finally {
     const exitCode = await new Promise<number>((resolve) => {

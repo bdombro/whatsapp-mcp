@@ -1,8 +1,8 @@
 # AGENTS.md (`whatsapp-mcp/mcp`)
 
-Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server and CLI.
+Written for: AI coding agents working in the `whatsapp-mcp/mcp` C++26 MCP server.
 
-`whatsapp-mcp/mcp` is a standalone C++26 application built on the `slimr-*` libraries (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) and CLI commands against `$(brew --prefix)/var/whatsapp-client/messages.db` and `daemon.sock` (`WHATSAPP_CLIENT_DATA_DIR` overrides).
+`whatsapp-mcp/mcp` is a standalone C++26 application built on the `slimr-*` libraries (`slimr::mcp` + `slimr::mcp_http`) providing all 16 WhatsApp MCP tools (`list_chats`, `list_messages`, `search_contacts`, `get_chat`, `get_direct_chat_by_contact`, `get_contact_chats`, `get_message_context`, `get_last_interaction`, `send_message`, `send_file`, `send_audio_message`, `download_media`, `export`, `sql`, `schema`, `status`) over `/mcp` and `/tools/<name>` against `$(brew --prefix)/var/whatsapp-client/messages.db` and `daemon.sock` (`WHATSAPP_CLIENT_DATA_DIR` overrides).
 
 Over Streamable HTTP (`whatsapp-mcp http`, default `127.0.0.1:10008`; OAuth `publicBaseUrl` stays `127.0.0.1`), it enforces OAuth 2.1 + PKCE (`S256`) with dynamic client registration (`POST /register`), RFC 9728 (`/.well-known/oauth-protected-resource`), RFC 8414 (`/.well-known/oauth-authorization-server`), browser QR pairing + explicit CSRF-protected approval (`GET /authorize`, `GET /authorize/qr`, `POST /authorize/approve`, `POST /authorize/cancel`), `POST /token` (refresh rotation + replay family revocation), and `POST /revoke`.
 
@@ -24,7 +24,7 @@ with implemented behavior; do not claim unverified release or client support.
 | Isolated MCP startup/discovery | `just test-mcp` |
 | Clean build artifacts | `just clean` |
 
-Release, install and `daemon-*` live in the repository-root justfile (two formulas); `CHANGELOG.md` and `VERSION` are at the repository root.
+Install and `daemon-*` live in the repository-root justfile (two formulas); release runs on merge to `main`, and `CHANGELOG.md` and `VERSION` live at the repository root.
 
 ## Rules
 
@@ -43,14 +43,18 @@ Release, install and `daemon-*` live in the repository-root justfile (two formul
 CMake declares targets/dependencies; Ninja owns incremental builds. Dependencies resolve from the pinned `slimr-*` registries in `vcpkg-configuration.json` (no overlays) and install under `build/deps/`; Debug sanitizer and Release trees live under `build/cmake/`. SQLite is statically linked with FTS5. `test-mcp` checks July discovery over ephemeral HTTP (OAuth-protected) with Bun against a scratch data dir; it does not call tools, open user databases, or connect to/start the daemon.
 
 <!-- cpp-templates:begin -->
+<!-- cpp-templates:commit c746b02c9f5b17b63c4921e6adff7fa8c5f6dc37 -->
+## Contributing
+
+Read the sections of [docs/contributing.md](docs/contributing.md) relevant to your change before editing.
+
 ## Tooling alignment
 
-Align this repository via the `cpp-templates` skill (`just check <template> .`). Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`. Do not hand-edit verbatim template files or template recipes (repositories may add extra recipes or variables).
+Align this repository via the `cpp-templates` skill, which diffs `base/` and `templates/<template>/` since the `<!-- cpp-templates:commit <sha> -->` marker above and adapts changes while preserving repository customizations. Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`.
 
 ## Edit-don't-rewrite
 
 - Make targeted edits and move files with `git mv`; never regenerate files from scratch or retype them from memory.
-- Template files arrive through `just new` or `just sync`.
 - Never delete, skip, or loosen tests to pass; if a test must change, explain why in the commit message.
 
 ## C++ Memory Safety
@@ -81,23 +85,19 @@ Iterate with `just test "<case>"` (Debug build with ASan + UBSan, `BUGSINK_DSN="
 
 ## Recipes
 
-- Core: `build`, `clean`, `configure`, `deps`, `doctor`, `fmt`, `lint`, `release`, `test [filter]`, `upgrade-deps`
+- Core: `build`, `clean`, `configure`, `deps`, `doctor`, `fmt`, `lint`, `test [filter]`, `upgrade-deps`
 - `homebrew-*`: `install`, `uninstall`
 - `homebrew-service` and `homebrew-mcp`: `daemon-logs`, `daemon-restart`, `daemon-start`, `daemon-status`, `daemon-stop`
 - `homebrew-mcp`: `test-mcp`
-- Dropped tooling (do not re-add): foreground runner, local tap/overlay symlinking, GitHub-branch/local-publish/dry-run helpers, standalone formula check, and JS formula helpers
+- Dropped tooling (do not re-add): foreground runner, local tap/overlay symlinking, GitHub-branch/local-publish/dry-run helpers, standalone formula check, `release` recipe, and JS formula helpers
 
 ## Changelog
 
-Add one line under `## Unreleased` in `CHANGELOG.md` for every change (use `Internal: ...` for internal changes).
+PRs touch no release files (`CHANGELOG.md`, `VERSION`, `versions/`). Write the PR title (and optional body) as the changelog entry; `release.yml` generates `CHANGELOG.md` from squash-merge commits after merge.
 
 ## Paths, env vars, and README
 
 - `<name>` in Homebrew paths is always the formula name, never a short XDG name: app data lives in `$(brew --prefix)/var/<name>`, config in `$(brew --prefix)/etc/<name>/`, and service secrets in `$(brew --prefix)/etc/<name>/env` (`chmod 600`, never in the public formula).
 - Secrets are env vars only.
-- Every `README.md` is end-user first: what it does, install, usage, env var table (name, required or optional, purpose), then links into `docs/` (`docs/development.md`, `docs/architecture.md`) for contributor workflow and architecture.
-
-## Remote tests
-
-Never run `test.yml` manually before `just release` (because `release` runs `test.yml` first). Run `test.yml` manually only when asked or to reproduce a Linux-only failure.
+- Every `README.md` is end-user first: what it does, install, usage, env var table (name, required or optional, purpose), then links into `docs/` (`docs/contributing.md`, `docs/architecture.md`) for contributor workflow and architecture.
 <!-- cpp-templates:end -->

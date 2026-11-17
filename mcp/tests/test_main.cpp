@@ -691,12 +691,31 @@ TEST_CASE("version and Bugsink release come from VERSION") {
     CHECK(status["version"].get_string() == WHATSAPP_APP_VERSION);
 }
 
-TEST_CASE("CLI runs the status tool") {
+TEST_CASE("server-only CLI rejects tool names and removed flags") {
     auto app = make_whatsapp_app();
     char arg0[] = "whatsapp-mcp";
-    char arg1[] = "status";
-    char *argv[] = {arg0, arg1, nullptr};
-    CHECK(app.run(2, argv) == 0);
+    {
+        char arg1[] = "status";
+        char *argv[] = {arg0, arg1, nullptr};
+        CHECK(app.run(2, argv) != 0);
+    }
+    {
+        char arg1[] = "--openapi";
+        char *argv[] = {arg0, arg1, nullptr};
+        CHECK(app.run(2, argv) != 0);
+    }
+    {
+        char arg1[] = "--remote";
+        char arg2[] = "http://127.0.0.1:10008";
+        char *argv[] = {arg0, arg1, arg2, nullptr};
+        CHECK(app.run(3, argv) != 0);
+    }
+    {
+        char arg1[] = "http";
+        char arg2[] = "--tools";
+        char *argv[] = {arg0, arg1, arg2, nullptr};
+        CHECK(app.run(3, argv) != 0);
+    }
     CHECK(slimr::McpHttpOptions{}.host == "127.0.0.1");
 }
 
@@ -1150,6 +1169,38 @@ TEST_CASE("http oauth 2.1 flow, qr pairing, approval, pkce, replay, scope, revoc
         auto wwwIt = writeDenied.headers.find("www-authenticate");
         REQUIRE(wwwIt != writeDenied.headers.end());
         CHECK(wwwIt->second.find("insufficient_scope") != std::string::npos);
+
+        // /tools/* surface: root routes 404, /tools/openapi.json + /tools/schema 200,
+        // /tools/<name> validates Bearer token against <base>/mcp audience and enforces scopes
+        CHECK(http_request(port, "GET", "/openapi.json", {}, "").status == 404);
+        CHECK(http_request(port, "GET", "/schema", {}, "").status == 404);
+        CHECK(http_request(port, "POST", "/status", {{"Content-Type", "application/json"}}, "{}").status == 404);
+
+        auto toolsOpenApi = http_request(port, "GET", "/tools/openapi.json", {}, "");
+        REQUIRE(toolsOpenApi.status == 200);
+        auto oa = parse_json_ok(toolsOpenApi.body);
+        CHECK(oa["paths"].contains("/tools/status"));
+        CHECK(http_request(port, "GET", "/tools/schema", {}, "").status == 200);
+
+        CHECK(http_request(port, "POST", "/tools/status", {{"Content-Type", "application/json"}}, "{}").status == 401);
+
+        auto toolsStatus = http_request(
+            port,
+            "POST",
+            "/tools/status",
+            {{"Content-Type", "application/json"}, {"Authorization", "Bearer " + readToken}},
+            "{}");
+        REQUIRE(toolsStatus.status == 200);
+        auto ts = parse_json_ok(toolsStatus.body);
+        CHECK(ts["version"].get_string() == WHATSAPP_APP_VERSION);
+
+        auto toolsWriteDenied = http_request(
+            port,
+            "POST",
+            "/tools/send_message",
+            {{"Content-Type", "application/json"}, {"Authorization", "Bearer " + readToken}},
+            R"({"recipient":"15551234567","message":"hi"})");
+        CHECK(toolsWriteDenied.status == 403);
     }
 
     // 8. Concurrent HTTP DB read calls under ASan/UBSan

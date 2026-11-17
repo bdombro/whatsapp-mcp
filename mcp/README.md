@@ -67,13 +67,20 @@ After starting the service, add this server to OpenCode v2.2.6's
 
 Use either an explicit server entry or a plugin manifest, not both.
 Alternative client schemas are in the
-[developer reference](docs/development.md). The compatibility notice above
+[contributor reference](docs/contributing.md). The compatibility notice above
 applies to every transport.
 
 
-## Tools & CLI Commands
+## Tools & HTTP Endpoints
 
-Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `127.0.0.1:10008`) and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`).
+Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `127.0.0.1:10008`) on `/mcp` and, by default, on `/tools/<name>` (with `/tools/openapi.json` and `/tools/schema`). Per-tool CLI invocations are not supported; debug tools over HTTP with `curl` and an OAuth Bearer token:
+
+```bash
+curl -X POST http://127.0.0.1:10008/tools/status \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
 
 | Tool | Scope | Kind | Description |
 | --- | --- | --- | --- |
@@ -85,7 +92,7 @@ Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [
 | `list_messages` | `whatsapp:read` | Read | Query messages by `chat_jid`, `sender_phone_or_lid`, `after`/`before` timestamps, or FTS5 BM25 keyword `query`, with optional surrounding context messages (`context_before`, `context_after`). |
 | `get_message_context` | `whatsapp:read` | Read | Fetch chronological messages immediately before and after a target `message_id`. |
 | `get_last_interaction` | `whatsapp:read` | Read | Most recent message exchanged with a contact `jid`. |
-| `export` | `whatsapp:read` | Read | Bulk chronological export across one or all chats (`chat_jids`, `since`, `until`, `cursor`). Over MCP returns compact token-efficient text lines; on CLI/in-process returns structured JSON pages. |
+| `export` | `whatsapp:read` | Read | Bulk chronological export across one or all chats (`chat_jids`, `since`, `until`, `cursor`). Returns compact token-efficient text lines over `/mcp` and `/tools/export`. |
 | `sql` | `whatsapp:read` | Read | Execute one read-only `SELECT` or `WITH` query against `v_messages`, `v_chats`, `v_contacts`, and `messages_fts` (default 200 rows, max 5000, 10 s timeout). |
 | `schema` | `whatsapp:read` | Read | Returns column definitions and query examples for `v_messages`, `v_chats`, `v_contacts`, and `messages_fts`. |
 | `status` | `whatsapp:read` | Read | Returns server version (from `VERSION`), resolved data directory, and `daemon.sock` path. |
@@ -137,5 +144,5 @@ Configure the service in `$(brew --prefix)/etc/whatsapp-mcp/env` (`chmod 600`, `
 
 ## Development
 
-See [docs/development.md](docs/development.md) for architecture, local builds,
+See [docs/contributing.md](docs/contributing.md) for architecture, local builds,
 testing and releases.

@@ -50,10 +50,6 @@ export function assertSemver(version: string, label = "Version"): string {
   return trimmed;
 }
 
-export function readVersion(versionPath: string): string {
-  return assertSemver(readFileSync(versionPath, "utf8"), versionPath);
-}
-
 export function sha256File(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
@@ -248,16 +244,71 @@ export function applyBump(version: string, bump: Bump): string {
   return `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
 }
 
-export function promoteChangelog(content: string, version: string, date: string): { changelog: string; notes: string } {
+const DOCS_ONLY_EXACT = new Set([
+  "README.md",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "LICENSE",
+  "docs/contributing.md",
+  "mcp/docs/contributing.md",
+  "docs/architecture.md",
+  "docs/development.md",
+  "client/docs/development.md",
+  ".clangd",
+  ".gitignore",
+  ".git-blame-ignore-revs",
+  ".clang-format-ignore",
+]);
+
+export function isDocsOnlyPath(file: string): boolean {
+  if (DOCS_ONLY_EXACT.has(file)) return true;
+  if (/^[^/]+\/AGENTS\.md$/.test(file)) return true;
+  if (file.startsWith(".vscode/")) return true;
+  return false;
+}
+
+export function isDocsOnlyFiles(files: string[]): boolean {
+  return files.length > 0 && files.every(isDocsOnlyPath);
+}
+
+export function bumpFromLabels(labels: string[]): Bump {
+  const normalized = new Set(labels.map((l) => l.trim()).filter(Boolean));
+  const hasMajor = normalized.has("release:major");
+  const hasMinor = normalized.has("release:minor");
+  if (hasMajor && hasMinor) {
+    throw new Error("Conflicting release labels: release:major and release:minor.");
+  }
+  if (hasMajor) return "major";
+  if (hasMinor) return "minor";
+  return "patch";
+}
+
+export function maxBump(a: Bump, b: Bump): Bump {
+  if (a === "major" || b === "major") return "major";
+  if (a === "minor" || b === "minor") return "minor";
+  return "patch";
+}
+
+export function formatCommitEntries(commits: Array<{ subject: string; body: string }>): string {
+  return commits
+    .map(({ subject, body }) => {
+      const bodyLines = body
+        .replaceAll("\r\n", "\n")
+        .split("\n")
+        .map((line) => line.trimEnd())
+        .filter((line) => line.trim().length > 0 && !/^(?:Co-authored-by|Signed-off-by):/i.test(line.trim()));
+      if (bodyLines.length === 0) return `- ${subject}`;
+      return `- ${subject}\n${bodyLines.map((line) => `  ${line}`).join("\n")}`;
+    })
+    .join("\n");
+}
+
+export function insertChangelogSection(content: string, version: string, date: string, body: string): string {
   const normalized = content.replaceAll("\r\n", "\n");
   const heading = /^## Unreleased[ \t]*$/gm;
   const matches = [...normalized.matchAll(heading)];
   if (matches.length !== 1) throw new Error("CHANGELOG.md must have exactly one ## Unreleased heading.");
-  const match = matches[0];
-  const body = normalized.slice(match.index + match[0].length).split(/^## /m)[0].trim();
-  if (!body) throw new Error("Add release notes under ## Unreleased before releasing.");
-  return {
-    changelog: normalized.replace(heading, `## Unreleased\n\n## v${version} - ${date}`),
-    notes: `${body}\n`,
-  };
+  const notes = body.trim();
+  if (!notes) throw new Error("Release notes must not be empty.");
+  return normalized.replace(heading, `## Unreleased\n\n## v${version} - ${date}\n\n${notes}`);
 }

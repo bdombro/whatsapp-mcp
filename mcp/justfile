@@ -7,7 +7,6 @@ tools := "list_chats,list_messages,search_contacts,get_chat,get_direct_chat_by_c
 test_target := "whatsapp_test"
 platforms := "macos linux"
 # Root justfile, root .github/ and root release scripts own two-service install, daemons and release
-check_skip := ".github/** scripts/release.ts scripts/formula-shared.ts scripts/test-mcp.ts _probe daemon-* install uninstall release"
 required := "brew bun cmake gh git jq just ninja vcpkg"
 log := `brew --prefix` + "/var/log/" + formula + ".log"
 llvm := env("LLVM_BIN", `brew --prefix llvm@23` + "/bin")

@@ -142,7 +142,7 @@ struct SqlInput {
 struct EmptyInput {};
 
 struct StatusInput {
-    OptField<std::optional<bool>, "CLI only: print JSON instead of text. MCP always returns JSON."> json;
+    OptField<std::optional<bool>, "Unused; status always returns JSON."> json;
 };
 
 struct ChatOutput {
