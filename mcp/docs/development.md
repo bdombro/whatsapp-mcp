@@ -68,14 +68,13 @@ For local development without touching the installed service (`10008`), run `./b
 
 ## Develop against an unreleased lib
 
-Add `"overlay-ports"` to the consumer's `vcpkg-configuration.json`, then run `just test` or `just build` as usual (add one entry per unreleased lib):
+vcpkg reads extra port dirs from `VCPKG_OVERLAY_PORTS`, and an overlay wins over the registry. Point it at a dir of symlinks, one per unreleased lib; manifests never change:
 
-```json
-{
-  "overlay-ports": [
-    "<relative path to ~/dev/slimr/<name>/ports/slimr-<name>>"
-  ]
-}
+```sh
+mkdir -p ~/.vcpkg/overlays/dev
+ln -s ~/dev/slimr/<name>/ports/slimr-<name> ~/.vcpkg/overlays/dev/slimr-<name>
+export VCPKG_OVERLAY_PORTS=~/.vcpkg/overlays/dev
+just test
 ```
 
-Remove `"overlay-ports"` and bump the registry baseline once the lib is released. Never commit or release with `overlay-ports` set.
+Remove the symlink (or `unset VCPKG_OVERLAY_PORTS`) to build against the released lib again. Keep the export out of shell startup files. `just release` refuses to run while `VCPKG_OVERLAY_PORTS` is set.
