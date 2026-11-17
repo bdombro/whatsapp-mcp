@@ -6,7 +6,7 @@
   "registries": [
     {
       "kind": "git",
-      "baseline": "38381ee822b79f9a96e080445038a4ea807e8468",
+      "baseline": "ceb69da2e208bce28e330dcfd328717b103a42ad",
       "repository": "https://github.com/slimr-down-now/serve.git",
       "packages": [
         "slimr-serve"
@@ -14,7 +14,7 @@
     },
     {
       "kind": "git",
-      "baseline": "c0258cd4ecbe7909aa9a68189d68f3d8a8462651",
+      "baseline": "823b8345946cc4cea2833395fb21184e60f9b141",
       "repository": "https://github.com/slimr-down-now/mcp.git",
       "packages": [
         "slimr-mcp"
