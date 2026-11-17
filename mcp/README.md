@@ -67,7 +67,7 @@ After starting the service, add this server to OpenCode v2.2.6's
 
 Use either an explicit server entry or a plugin manifest, not both.
 Alternative client schemas are in the
-[developer reference](docs/development.md). The compatibility notice above
+[contributor reference](docs/contributing.md). The compatibility notice above
 applies to every transport.
 
 
@@ -137,5 +137,5 @@ Configure the service in `$(brew --prefix)/etc/whatsapp-mcp/env` (`chmod 600`, `
 
 ## Development
 
-See [docs/development.md](docs/development.md) for architecture, local builds,
+See [docs/contributing.md](docs/contributing.md) for architecture, local builds,
 testing and releases.

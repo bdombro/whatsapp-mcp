@@ -21,7 +21,6 @@ with implemented behavior; do not claim unverified release or client support.
 | Isolated MCP startup/discovery | `just test-mcp` |
 | Verify toolchain | `just doctor` |
 | Update vcpkg baselines and Go modules | `just upgrade-deps` |
-| Release both formulas via `release.yml` | `just release <patch\|minor\|major>` |
 | Both brew services (only when asked) | `just install`, `just daemon-{start,stop,restart,status,logs}` |
 | Clean build artifacts | `just clean` |
 
@@ -46,6 +45,10 @@ with implemented behavior; do not claim unverified release or client support.
 `mcp/` is checked against the cpp-templates `homebrew-mcp` template (`just check homebrew-mcp plugins/whatsapp-mcp/mcp` from the workspace). The root justfile, root `.github/`, `scripts/{release,formula-shared}.ts`, `Formula/`, `VERSION`, `CHANGELOG.md` and Go `client/` stay repo-owned: the root delegates to `client/` and `mcp/`, and its `daemon-*`, `install` and `uninstall` recipes act on both formulas. Apps read `$(brew --prefix)/var/whatsapp-client` (or `WHATSAPP_CLIENT_DATA_DIR`) and never migrate data. Keep LaunchAgent and brew service deployment separate from portable tests; never start a daemon or service during validation.
 
 <!-- cpp-templates:begin -->
+## Contributing
+
+Read the sections of [docs/contributing.md](docs/contributing.md) relevant to your change before editing.
+
 ## Tooling alignment
 
 Align this repository via the `cpp-templates` skill (`just check <template> .`). Keep repository-specific rules outside `<!-- cpp-templates:begin -->` and `<!-- cpp-templates:end -->`. Do not hand-edit verbatim template files or template recipes (repositories may add extra recipes or variables).
@@ -84,23 +87,19 @@ Iterate with `just test "<case>"` (Debug build with ASan + UBSan, `BUGSINK_DSN="
 
 ## Recipes
 
-- Core: `build`, `clean`, `configure`, `deps`, `doctor`, `fmt`, `lint`, `release`, `test [filter]`, `upgrade-deps`
+- Core: `build`, `clean`, `configure`, `deps`, `doctor`, `fmt`, `lint`, `test [filter]`, `upgrade-deps`
 - `homebrew-*`: `install`, `uninstall`
 - `homebrew-service` and `homebrew-mcp`: `daemon-logs`, `daemon-restart`, `daemon-start`, `daemon-status`, `daemon-stop`
 - `homebrew-mcp`: `test-mcp`
-- Dropped tooling (do not re-add): foreground runner, local tap/overlay symlinking, GitHub-branch/local-publish/dry-run helpers, standalone formula check, and JS formula helpers
+- Dropped tooling (do not re-add): foreground runner, local tap/overlay symlinking, GitHub-branch/local-publish/dry-run helpers, standalone formula check, `release` recipe, and JS formula helpers
 
 ## Changelog
 
-Add one line under `## Unreleased` in `CHANGELOG.md` for every change (use `Internal: ...` for internal changes).
+PRs touch no release files (`CHANGELOG.md`, `VERSION`, `versions/`). Write the PR title (and optional body) as the changelog entry; `release.yml` generates `CHANGELOG.md` from squash-merge commits after merge.
 
 ## Paths, env vars, and README
 
 - `<name>` in Homebrew paths is always the formula name, never a short XDG name: app data lives in `$(brew --prefix)/var/<name>`, config in `$(brew --prefix)/etc/<name>/`, and service secrets in `$(brew --prefix)/etc/<name>/env` (`chmod 600`, never in the public formula).
 - Secrets are env vars only.
-- Every `README.md` is end-user first: what it does, install, usage, env var table (name, required or optional, purpose), then links into `docs/` (`docs/development.md`, `docs/architecture.md`) for contributor workflow and architecture.
-
-## Remote tests
-
-Never run `test.yml` manually before `just release` (because `release` runs `test.yml` first). Run `test.yml` manually only when asked or to reproduce a Linux-only failure.
+- Every `README.md` is end-user first: what it does, install, usage, env var table (name, required or optional, purpose), then links into `docs/` (`docs/contributing.md`, `docs/architecture.md`) for contributor workflow and architecture.
 <!-- cpp-templates:end -->

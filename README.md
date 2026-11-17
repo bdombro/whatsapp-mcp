@@ -44,7 +44,7 @@ Two formulas, two services: `whatsapp-client` (Go sync daemon) and
 `whatsapp-mcp` (C++26 MCP server). Check
 [releases](https://github.com/bdombro/whatsapp-mcp/releases) for published
 binaries first; if none is published yet, build from source per
-[development](docs/development.md). Installing a Cursor/Claude manifest only
+[contributing](docs/contributing.md). Installing a Cursor/Claude manifest only
 configures an endpoint; it doesn't install or start either service.
 
 ## Start and Manage the Services
@@ -100,7 +100,7 @@ After starting the service, add this server to OpenCode v2.2.6's
 
 Use either an explicit server entry or a plugin manifest, not both.
 Alternative client schemas are in the
-[developer reference](docs/development.md). The compatibility notice above
+[contributor reference](docs/contributing.md). The compatibility notice above
 applies to every transport.
 
 
@@ -145,5 +145,5 @@ databases and socket.
 
 ## Development
 
-See [docs/development.md](docs/development.md) for architecture, local builds,
+See [docs/contributing.md](docs/contributing.md) for architecture, local builds,
 testing and releases.

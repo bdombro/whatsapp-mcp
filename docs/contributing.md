@@ -1,4 +1,4 @@
-# whatsapp-mcp: Developer Reference
+# whatsapp-mcp: Contributing
 
 User installation, configuration and compatibility status are in the
 [README](../README.md). This reference preserves implementation details,
@@ -9,6 +9,57 @@ Dependencies resolve directly from the pinned `slimr-down-now/*` vcpkg git
 registries in `mcp/vcpkg-configuration.json` (no local overlays). CI
 configuration is not evidence that a runner/platform/client has passed.
 
+<!-- cpp-templates:begin -->
+## Contents
+
+- [Develop and test](#develop-and-test)
+- [Unreleased libraries](#unreleased-libraries)
+- [Rules](#rules)
+- [PR, CI, and release flow](#pr-ci-and-release-flow)
+- [Dependency bumps](#dependency-bumps)
+
+## Develop and test
+
+```bash
+just doctor
+just test
+just lint
+```
+
+Iterate on a single doctest case with `just test "<case>"` (Debug build with ASan + UBSan, `BUGSINK_DSN=""`). For `homebrew-mcp` repos, run `just test-mcp` as well.
+
+## Unreleased libraries
+
+vcpkg reads extra port dirs from `VCPKG_OVERLAY_PORTS`, and an overlay wins over the registry. Point it at a dir of symlinks, one per unreleased lib; manifests never change:
+
+```sh
+mkdir -p ~/.vcpkg/overlays/dev
+ln -s ~/dev/slimr/<lib>/ports/slimr-<lib> ~/.vcpkg/overlays/dev/slimr-<lib>
+export VCPKG_OVERLAY_PORTS=~/.vcpkg/overlays/dev
+just test
+```
+
+Remove the symlink (or `unset VCPKG_OVERLAY_PORTS`) to build against the released lib again. Keep the export out of shell startup files.
+
+## Rules
+
+- Never push directly to `main`; all changes land through squash-merged pull requests.
+- PRs touch no release files (`VERSION`, `CHANGELOG.md`, `versions/`, `Formula/*.rb`, `Casks/*.rb`).
+- Write the PR title (plus optional body) as the changelog entry; squash-merge turns it into one commit on `main`.
+- Sanitize everything (no secrets, tokens, DSNs, or personal data in commits, logs, or docs).
+- Run `just test` (ASan + UBSan) and `just lint` before opening or updating a PR.
+
+## PR, CI, and release flow
+
+- Every PR runs `test.yml`: a `gate` job skips macOS/Linux builds on docs-only PRs, and a single `ci` summary job gates merge.
+- Merging to `main` triggers `release.yml` (one release at a time). It collects squash commits since the last tag (skipping docs-only ranges), picks the bump from merged PR labels (`patch` default, or `release:minor` / `release:major`; agents must ask before adding labels), writes `VERSION`/`vcpkg.json`, `CHANGELOG.md` (and `vcpkg x-add-version` for libraries), commits as the GitHub App, tags `vX.Y.Z`, and publishes the GitHub Release (plus assets and `Formula/*.rb` / `Casks/*.rb` updates).
+- Pre-releases are a known option (tag/channel), not currently built.
+
+## Dependency bumps
+
+Bump a library baseline in `vcpkg-configuration.json` only when a bug fix, new API, or security fix requires it; otherwise wait for the next `just upgrade-deps`.
+<!-- cpp-templates:end -->
+
 ## App Architecture
 
 The `client/` is a Go daemon using `whatsmeow`; the stateless `mcp/` server and JSON CLI are implemented in C++26 on the `slimr-*` libraries.
@@ -17,7 +68,7 @@ The `client/` is a Go daemon using `whatsmeow`; the stateless `mcp/` server and 
 plugins/whatsapp-mcp/
 ├── VERSION                   # Shared version compiled into both binaries
 ├── CHANGELOG.md              # Release notes (## Unreleased)
-├── justfile                  # Delegates to client/ and mcp/; both brew services (daemon-*), install, release, cutover
+├── justfile                  # Delegates to client/ and mcp/; both brew services (daemon-*), install, cutover
 ├── Formula/                  # whatsapp-client.rb and whatsapp-mcp.rb (macOS/Linux, service + env file loader)
 ├── .github/
 │   ├── actions/setup/action.yml     # Toolchain, Go, vcpkg bootstrap + binary cache
@@ -112,7 +163,6 @@ just fmt               # Format C++, Go, and justfiles
 just lint              # Format checks + clang-tidy (mcp/.clang-tidy)
 just test-mcp          # Bun ephemeral HTTP MCP 2026-07-28 discovery, isolated from production data
 just upgrade-deps      # Update vcpkg registry baselines and Go modules, then run tests
-just release patch     # Trigger release.yml (test -> build both binaries -> both formulas -> tag -> GitHub release) and pull
 just install           # Clean-install both released formulas, brew test them, start both services
 just daemon-status     # brew services info for both formulas (also daemon-start/stop/restart/logs)
 just clean             # Remove build outputs only; leaves user data untouched
@@ -122,18 +172,4 @@ just clean             # Remove build outputs only; leaves user data untouched
 
 For local development without touching the installed `whatsapp-mcp` service (`10008`), run `./mcp/build/bin/whatsapp-mcp http --port 20008` (dev endpoint `http://127.0.0.1:20008/mcp`) against a scratch `WHATSAPP_CLIENT_DATA_DIR`.
 
-See the [MCP developer reference](../mcp/docs/development.md#building--testing) for C++ details. CI (`test.yml`, `release.yml`) runs on `macos-26` and `ubuntu-24.04` on pull requests or manual `just release` dispatch; local macOS validation is not Linux execution evidence.
-
-## Develop against an unreleased lib
-
-Add `"overlay-ports"` to the consumer's `vcpkg-configuration.json`, then run `just test` or `just build` as usual (add one entry per unreleased lib):
-
-```json
-{
-  "overlay-ports": [
-    "<relative path to ~/dev/slimr/<name>/ports/slimr-<name>>"
-  ]
-}
-```
-
-Remove `"overlay-ports"` and bump the registry baseline once the lib is released. Never commit or release with `overlay-ports` set.
+See the [MCP contributor reference](../mcp/docs/contributing.md#building--testing) for C++ details. CI (`test.yml`, `release.yml`) runs on `macos-26` and `ubuntu-24.04` on pull requests and merges to `main`; local macOS validation is not Linux execution evidence.

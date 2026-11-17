@@ -1,8 +1,59 @@
-# WhatsApp MCP: Developer Reference
+# WhatsApp MCP: Contributing
 
 [User setup](../README.md) | [Repository setup](../../README.md)
 
-## App Architecture
+<!-- cpp-templates:begin -->
+## Contents
+
+- [Develop and test](#develop-and-test)
+- [Unreleased libraries](#unreleased-libraries)
+- [Rules](#rules)
+- [PR, CI, and release flow](#pr-ci-and-release-flow)
+- [Dependency bumps](#dependency-bumps)
+
+## Develop and test
+
+```bash
+just doctor
+just test
+just lint
+```
+
+Iterate on a single doctest case with `just test "<case>"` (Debug build with ASan + UBSan, `BUGSINK_DSN=""`). For `homebrew-mcp` repos, run `just test-mcp` as well.
+
+## Unreleased libraries
+
+vcpkg reads extra port dirs from `VCPKG_OVERLAY_PORTS`, and an overlay wins over the registry. Point it at a dir of symlinks, one per unreleased lib; manifests never change:
+
+```sh
+mkdir -p ~/.vcpkg/overlays/dev
+ln -s ~/dev/slimr/<lib>/ports/slimr-<lib> ~/.vcpkg/overlays/dev/slimr-<lib>
+export VCPKG_OVERLAY_PORTS=~/.vcpkg/overlays/dev
+just test
+```
+
+Remove the symlink (or `unset VCPKG_OVERLAY_PORTS`) to build against the released lib again. Keep the export out of shell startup files.
+
+## Rules
+
+- Never push directly to `main`; all changes land through squash-merged pull requests.
+- PRs touch no release files (`VERSION`, `CHANGELOG.md`, `versions/`, `Formula/*.rb`, `Casks/*.rb`).
+- Write the PR title (plus optional body) as the changelog entry; squash-merge turns it into one commit on `main`.
+- Sanitize everything (no secrets, tokens, DSNs, or personal data in commits, logs, or docs).
+- Run `just test` (ASan + UBSan) and `just lint` before opening or updating a PR.
+
+## PR, CI, and release flow
+
+- Every PR runs `test.yml`: a `gate` job skips macOS/Linux builds on docs-only PRs, and a single `ci` summary job gates merge.
+- Merging to `main` triggers `release.yml` (one release at a time). It collects squash commits since the last tag (skipping docs-only ranges), picks the bump from merged PR labels (`patch` default, or `release:minor` / `release:major`; agents must ask before adding labels), writes `VERSION`/`vcpkg.json`, `CHANGELOG.md` (and `vcpkg x-add-version` for libraries), commits as the GitHub App, tags `vX.Y.Z`, and publishes the GitHub Release (plus assets and `Formula/*.rb` / `Casks/*.rb` updates).
+- Pre-releases are a known option (tag/channel), not currently built.
+
+## Dependency bumps
+
+Bump a library baseline in `vcpkg-configuration.json` only when a bug fix, new API, or security fix requires it; otherwise wait for the next `just upgrade-deps`.
+<!-- cpp-templates:end -->
+
+## Repository tips
 
 The stateless MCP server and JSON CLI are implemented in C++26 on the `slimr-*` libraries, aligned to the cpp-templates `homebrew-mcp` template. It reads `messages.db` and uses the companion Go `whatsapp-client` only for sends and media downloads.
 
@@ -44,7 +95,7 @@ When launched via `whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <p
 ## Building & Testing
 
 Prerequisites, Linux notes and the release flow are in the
-[repository developer reference](../../docs/development.md#building--testing);
+[repository contributor reference](../../docs/contributing.md#building--testing);
 `just doctor` checks them. Dependencies resolve from the pinned `slimr-*`
 registries in `vcpkg-configuration.json` and install under `build/deps/`
 automatically before configure/build/test/lint; CMake manifest auto-install is
@@ -65,16 +116,3 @@ just clean             # Remove build/ only; leaves user data untouched
 For local development without touching the installed service (`10008`), run `./build/bin/whatsapp-mcp http --port 20008` with a scratch `WHATSAPP_CLIENT_DATA_DIR`.
 
 `scripts/test-mcp.ts` runs the server against a scratch `WHATSAPP_CLIENT_DATA_DIR` with Bugsink disabled; it never opens production databases, invokes tools, or starts/connects to the daemon.
-
-## Develop against an unreleased lib
-
-vcpkg reads extra port dirs from `VCPKG_OVERLAY_PORTS`, and an overlay wins over the registry. Point it at a dir of symlinks, one per unreleased lib; manifests never change:
-
-```sh
-mkdir -p ~/.vcpkg/overlays/dev
-ln -s ~/dev/slimr/<name>/ports/slimr-<name> ~/.vcpkg/overlays/dev/slimr-<name>
-export VCPKG_OVERLAY_PORTS=~/.vcpkg/overlays/dev
-just test
-```
-
-Remove the symlink (or `unset VCPKG_OVERLAY_PORTS`) to build against the released lib again. Keep the export out of shell startup files. `just release` refuses to run while `VCPKG_OVERLAY_PORTS` is set.

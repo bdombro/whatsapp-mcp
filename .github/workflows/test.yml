@@ -1,27 +1,57 @@
 name: test
-on: [workflow_dispatch, workflow_call, pull_request]
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 
 jobs:
-  platforms:
+  gate:
     runs-on: ubuntu-24.04
     outputs:
-      runners: ${{ steps.p.outputs.runners }}
+      run_tests: ${{ steps.classify.outputs.run_tests }}
+      runners: ${{ steps.platforms.outputs.runners || '[]' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: extractions/setup-just@v3
-      - id: p
+      - uses: oven-sh/setup-bun@v2
+      - id: platforms
         run: |
           runners="$(just --evaluate platforms | jq -Rc 'split(" ") | map(select(length > 0) | {macos: "macos-26", linux: "ubuntu-24.04"}[.] // error("unknown platform: \(.)"))')"
           echo "runners=$runners" >> "$GITHUB_OUTPUT"
+      - id: classify
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run_tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base_ref="${{ github.base_ref }}"
+          git fetch origin "$base_ref"
+          mapfile -t changed < <(git diff --name-only "origin/${base_ref}...HEAD")
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "run_tests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          docs_only="$(bun scripts/release.ts classify "${changed[@]}")"
+          if [ "$docs_only" = "true" ]; then
+            echo "run_tests=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_tests=true" >> "$GITHUB_OUTPUT"
+          fi
 
   test:
-    needs: platforms
+    needs: gate
+    if: needs.gate.outputs.run_tests == 'true'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.platforms.outputs.runners) }}
+        os: ${{ fromJSON(needs.gate.outputs.runners) }}
     runs-on: ${{ matrix.os }}
     env:
       BUGSINK_DSN: ""
@@ -32,3 +62,19 @@ jobs:
       - run: just lint
       - if: hashFiles('mcp/scripts/test-mcp.ts') != ''
         run: just test-mcp
+
+  ci:
+    needs: [gate, test]
+    if: always() && !cancelled()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check workflow status
+        run: |
+          if [ "${{ needs.gate.result }}" != "success" ]; then
+            echo "::error::gate=${{ needs.gate.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.test.result }}" != "success" ] && [ "${{ needs.test.result }}" != "skipped" ]; then
+            echo "::error::test=${{ needs.test.result }}"
+            exit 1
+          fi

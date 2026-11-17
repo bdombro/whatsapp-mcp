@@ -1,62 +1,44 @@
 name: release
 on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        type: choice
-        required: true
-        default: patch
-        options: [patch, minor, major]
-concurrency: release
+  push:
+    branches: [main]
+concurrency:
+  group: release
+  cancel-in-progress: false
 permissions:
   contents: write
-  actions: read
+  pull-requests: read
 
 jobs:
   plan:
     runs-on: ubuntu-24.04
     outputs:
+      should_release: ${{ steps.plan.outputs.should_release }}
       version: ${{ steps.plan.outputs.version }}
-      runners: ${{ steps.plan.outputs.runners }}
-      run_test: ${{ steps.test-check.outputs.run_test }}
+      runners: ${{ steps.plan.outputs.runners || '[]' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: extractions/setup-just@v3
       - uses: oven-sh/setup-bun@v2
       - id: plan
-        run: |
-          version="$(bun scripts/release.ts next "${{ inputs.bump }}")"
-          runners="$(just --evaluate platforms | jq -Rc 'split(" ") | map(select(length > 0) | {macos: "macos-26", linux: "ubuntu-24.04"}[.] // error("unknown platform: \(.)"))')"
-          {
-            echo "version=$version"
-            echo "runners=$runners"
-          } >> "$GITHUB_OUTPUT"
-      - id: test-check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_test=true
-          if runs_json="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow test.yml --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId,event,headBranch 2>&1)"; then
-            if printf '%s' "$runs_json" | jq -e 'length > 0' >/dev/null 2>&1; then
-              run_test=false
-              match="$(printf '%s' "$runs_json" | jq -r '.[0] | "id=\(.databaseId) event=\(.event) branch=\(.headBranch)"')"
-              echo "Skipping test job; found passing test.yml run ($match)"
-            else
-              echo "No passing test.yml run for $GITHUB_SHA; running test job"
-            fi
-          else
-            echo "::warning::gh run list failed ($runs_json); falling back to running test job"
-          fi
-          echo "run_test=$run_test" >> "$GITHUB_OUTPUT"
-
-  test:
-    needs: plan
-    if: needs.plan.outputs.run_test == 'true'
-    uses: ./.github/workflows/test.yml
+          runners="$(just --evaluate platforms | jq -Rc 'split(" ") | map(select(length > 0) | {macos: "macos-26", linux: "ubuntu-24.04"}[.] // error("unknown platform: \(.)"))')"
+          plan_json="$(bun scripts/release.ts plan)"
+          should_release="$(printf '%s' "$plan_json" | jq -r '.should_release')"
+          version="$(printf '%s' "$plan_json" | jq -r '.version')"
+          {
+            echo "should_release=$should_release"
+            echo "version=$version"
+            echo "runners=$runners"
+          } >> "$GITHUB_OUTPUT"
 
   build:
-    needs: [plan, test]
-    if: always() && !cancelled() && needs.plan.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    needs: plan
+    if: needs.plan.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -109,15 +91,19 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [plan, test, build]
-    if: always() && !cancelled() && needs.plan.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [plan, build]
+    if: always() && !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.should_release == 'true' && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: ubuntu-24.04
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
       - uses: extractions/setup-just@v3
       - uses: oven-sh/setup-bun@v2
       - uses: actions/download-artifact@v4
@@ -126,6 +112,8 @@ jobs:
           merge-multiple: true
       - name: Configure git author
         run: |
-          git config user.name "$(git log -1 --format='%an')"
-          git config user.email "$(git log -1 --format='%ae')"
-      - run: bun scripts/release.ts publish "${{ needs.plan.outputs.version }}" assets
+          git config user.name "bdombro-release-bot[bot]"
+          git config user.email "bdombro-release-bot[bot]@users.noreply.github.com"
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun scripts/release.ts publish "${{ needs.plan.outputs.version }}" assets

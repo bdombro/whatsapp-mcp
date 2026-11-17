@@ -33,15 +33,60 @@ runs:
       id: vcpkg-ref
       shell: bash
       run: |
-        baseline=""
-        if [ -f mcp/vcpkg-configuration.json ]; then
-          baseline="$(jq -r '.["default-registry"].baseline // empty' mcp/vcpkg-configuration.json)"
-          if [ -n "$baseline" ] && ! [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::default-registry.baseline in mcp/vcpkg-configuration.json must be a 40-char commit SHA"
+        config_file=""
+        if [ -f vcpkg-configuration.json ]; then
+          config_file="vcpkg-configuration.json"
+        else
+          shopt -s nullglob
+          candidates=(*/vcpkg-configuration.json */*/vcpkg-configuration.json)
+          if [ "${#candidates[@]}" -eq 1 ]; then
+            config_file="${candidates[0]}"
+          elif [ "${#candidates[@]}" -gt 1 ]; then
+            echo "::error::Multiple vcpkg-configuration.json files found: ${candidates[*]}"
             exit 1
           fi
         fi
-        echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
+        baseline=""
+        vcpkg_glob="vcpkg*.json"
+        triplets_glob="triplets/*.cmake"
+        if [ -n "$config_file" ]; then
+          baseline="$(jq -r '.["default-registry"].baseline // empty' "$config_file")"
+          if [ -n "$baseline" ] && ! [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::default-registry.baseline in $config_file must be a 40-char commit SHA"
+            exit 1
+          fi
+          config_dir="$(dirname "$config_file")"
+          if [ "$config_dir" != "." ]; then
+            vcpkg_glob="$config_dir/vcpkg*.json"
+            triplets_glob="$config_dir/triplets/*.cmake"
+          fi
+        fi
+        {
+          echo "baseline=$baseline"
+          echo "vcpkg_glob=$vcpkg_glob"
+          echo "triplets_glob=$triplets_glob"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Detect cache environment
+      if: steps.vcpkg-ref.outputs.baseline != ''
+      id: env
+      shell: bash
+      run: |
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          triplet="arm64-osx"
+        else
+          triplet="x64-linux"
+        fi
+        clang_bin="$(brew --prefix llvm@23)/bin/clang++"
+        ver="$("$clang_bin" --version | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -n 1)"
+        if [ -z "$ver" ]; then
+          echo "::error::Cannot determine llvm@23 clang++ major version"
+          exit 1
+        fi
+        {
+          echo "triplet=$triplet"
+          echo "compiler=clang-$ver"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Checkout vcpkg
       if: steps.vcpkg-ref.outputs.baseline != ''
@@ -70,7 +115,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ runner.temp }}/vcpkg-cache
-        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-${{ hashFiles('mcp/vcpkg*.json') }}
+        key: vcpkg-${{ runner.os }}-${{ steps.env.outputs.triplet }}-${{ steps.env.outputs.compiler }}-${{ steps.vcpkg-ref.outputs.baseline }}-${{ hashFiles(steps.vcpkg-ref.outputs.vcpkg_glob, 'ports/*/vcpkg.json', steps.vcpkg-ref.outputs.triplets_glob) }}
         restore-keys: |
-          vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-ref.outputs.baseline }}-
-          vcpkg-${{ runner.os }}-${{ runner.arch }}-
+          vcpkg-${{ runner.os }}-${{ steps.env.outputs.triplet }}-${{ steps.env.outputs.compiler }}-${{ steps.vcpkg-ref.outputs.baseline }}-
+          vcpkg-${{ runner.os }}-${{ steps.env.outputs.triplet }}-${{ steps.env.outputs.compiler }}-
