@@ -69,7 +69,7 @@ plugins/whatsapp-mcp/
 
 ## `.mcp.json` Configuration
 
-`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `0.0.0.0:10008`, `http://127.0.0.1:10008/mcp` locally, with OAuth 2.1 + PKCE and a browser QR/approval UI) or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
+`whatsapp-mcp/mcp` runs standalone over Streamable HTTP (default bind `127.0.0.1:10008`, `http://127.0.0.1:10008/mcp`, with OAuth 2.1 + PKCE and a browser QR/approval UI) or direct CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`), exposing canonical unprefixed tool names (`list_chats`, `get_chat`, `list_messages`, `export`, `sql`, `schema`, `send_message`, `status`, …).
 
 To configure `whatsapp-mcp` over HTTP in `.mcp.json`:
 
@@ -123,3 +123,17 @@ just clean             # Remove build outputs only; leaves user data untouched
 For local development without touching the installed `whatsapp-mcp` service (`10008`), run `./mcp/build/bin/whatsapp-mcp http --port 20008` (dev endpoint `http://127.0.0.1:20008/mcp`) against a scratch `WHATSAPP_CLIENT_DATA_DIR`.
 
 See the [MCP developer reference](../mcp/docs/development.md#building--testing) for C++ details. CI (`test.yml`, `release.yml`) runs on `macos-26` and `ubuntu-24.04` on pull requests or manual `just release` dispatch; local macOS validation is not Linux execution evidence.
+
+## Develop against an unreleased lib
+
+Add `"overlay-ports"` to the consumer's `vcpkg-configuration.json`, then run `just test` or `just build` as usual (add one entry per unreleased lib):
+
+```json
+{
+  "overlay-ports": [
+    "<relative path to ~/dev/slimr/<name>/ports/slimr-<name>>"
+  ]
+}
+```
+
+Remove `"overlay-ports"` and bump the registry baseline once the lib is released. Never commit or release with `overlay-ports` set.

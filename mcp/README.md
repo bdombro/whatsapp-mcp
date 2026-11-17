@@ -38,9 +38,9 @@ brew services start whatsapp-mcp
 ```
 
 Follow the [repository setup](../README.md#start-and-manage-the-services):
-exactly one sync daemon, two services. The HTTP server binds `0.0.0.0:10008`
-(OAuth metadata advertises `127.0.0.1`; pass `--host 127.0.0.1` for
-loopback-only) and logs to `$(brew --prefix)/var/log/whatsapp-mcp.log`
+exactly one sync daemon, two services. The HTTP server binds `127.0.0.1:10008`
+(pass `--host 0.0.0.0` to expose on all interfaces; OAuth metadata still
+advertises `127.0.0.1`) and logs to `$(brew --prefix)/var/log/whatsapp-mcp.log`
 (rotates to `.1` at 10 MiB). It uses OAuth and explicit browser approval; the
 sync daemon must already be running. A remote agent is not automatically
 authorized merely because WhatsApp is paired.
@@ -73,7 +73,7 @@ applies to every transport.
 
 ## Tools & CLI Commands
 
-Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `0.0.0.0:10008`) and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`).
+Every tool is exposed over Streamable HTTP (`whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]`, default `127.0.0.1:10008`) and CLI (`whatsapp-mcp <tool> ['{"arg":"val"}']`).
 
 | Tool | Scope | Kind | Description |
 | --- | --- | --- | --- |

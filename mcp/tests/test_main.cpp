@@ -697,6 +697,7 @@ TEST_CASE("CLI runs the status tool") {
     char arg1[] = "status";
     char *argv[] = {arg0, arg1, nullptr};
     CHECK(app.run(2, argv) == 0);
+    CHECK(slimr::McpHttpOptions{}.host == "127.0.0.1");
 }
 
 TEST_CASE("OAuth AS routes accept loopback peers only") {

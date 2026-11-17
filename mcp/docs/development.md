@@ -19,7 +19,7 @@ The stateless MCP server and JSON CLI are implemented in C++26 on the `slimr-*` 
 
 ## HTTP Transport, OAuth 2.1 & Browser Connect UX
 
-When launched via `whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]` (default bind `0.0.0.0:10008`; OAuth metadata and `publicBaseUrl` advertise `http://127.0.0.1:<port>` unless `--host` names a specific address), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
+When launched via `whatsapp-mcp http [--host <addr>] [--port <n>] [--log-file <path>]` (default bind `127.0.0.1:10008`; OAuth metadata and `publicBaseUrl` advertise `http://127.0.0.1:<port>` unless `--host` names a specific address), the server exposes `POST /mcp` protected by OAuth 2.1 + PKCE (`S256`):
 - `GET /.well-known/oauth-protected-resource` (RFC 9728) & `GET /.well-known/oauth-authorization-server` (RFC 8414)
 - `POST /register` (RFC 7591 dynamic client registration restricted to loopback redirect URIs)
 - `GET /authorize` + `GET /authorize/qr` + `POST /authorize/approve` + `POST /authorize/cancel` (CSRF-protected browser Connect page; renders live QR SVG when `whatsapp-client` is unpaired, or shows the already-paired JID for explicit owner approval without touching `whatsapp.db`)
@@ -65,3 +65,17 @@ just clean             # Remove build/ only; leaves user data untouched
 For local development without touching the installed service (`10008`), run `./build/bin/whatsapp-mcp http --port 20008` with a scratch `WHATSAPP_CLIENT_DATA_DIR`.
 
 `scripts/test-mcp.ts` runs the server against a scratch `WHATSAPP_CLIENT_DATA_DIR` with Bugsink disabled; it never opens production databases, invokes tools, or starts/connects to the daemon.
+
+## Develop against an unreleased lib
+
+Add `"overlay-ports"` to the consumer's `vcpkg-configuration.json`, then run `just test` or `just build` as usual (add one entry per unreleased lib):
+
+```json
+{
+  "overlay-ports": [
+    "<relative path to ~/dev/slimr/<name>/ports/slimr-<name>>"
+  ]
+}
+```
+
+Remove `"overlay-ports"` and bump the registry baseline once the lib is released. Never commit or release with `overlay-ports` set.

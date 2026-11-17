@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
     auto app = whatsapp::make_whatsapp_app();
 
-    std::string host = "0.0.0.0";
+    std::string host = "127.0.0.1";
     int port = 10008;
     for (size_t i = 2; i < filteredArgv.size(); ++i) {
         std::string_view arg = filteredArgv[i];
@@ -75,8 +75,8 @@ int main(int argc, char **argv) {
     }
 
     slimr::McpHttpOptions httpOpts;
-    httpOpts.host = "0.0.0.0";
-    httpOpts.port = 10008;
+    httpOpts.host = host;
+    httpOpts.port = static_cast<uint16_t>(port);
 
     const std::string dataDir = whatsapp::resolve_data_dir();
     const std::string sockPath = whatsapp::resolve_socket_path(dataDir);

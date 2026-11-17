@@ -61,8 +61,9 @@ brew services info whatsapp-mcp
 ```
 
 Restart or stop with `brew services restart|stop <formula>`. The MCP HTTP
-server binds `0.0.0.0:10008` (`http://127.0.0.1:10008/mcp` locally; OAuth
-metadata advertises `127.0.0.1`). Pass `--host 127.0.0.1` for loopback-only.
+server binds `127.0.0.1:10008` (`http://127.0.0.1:10008/mcp`; pass
+`--host 0.0.0.0` to expose on all interfaces, with OAuth metadata still
+advertising `127.0.0.1`).
 Logs go to `$(brew --prefix)/var/log/whatsapp-client.log` and
 `$(brew --prefix)/var/log/whatsapp-mcp.log` (each rotates to `.1` at 10 MiB).
 To run the MCP in the foreground instead, use `whatsapp-mcp http`; don't run
