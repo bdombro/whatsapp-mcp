@@ -1,16 +1,16 @@
 class WhatsappMcp < Formula
   desc "WhatsApp MCP Streamable HTTP server with OAuth 2.1 and browser QR pairing"
   homepage "https://github.com/bdombro/whatsapp-mcp"
-  version "3.1.1"
+  version "3.1.2"
 
   on_macos do
-    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.1/whatsapp-mcp-arm64-macos.tar.gz"
-    sha256 "2913ead2fc024198a1d63fb6a4fb3249c6e9cd496a68b0cf46ddcd1cf015033d"
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.2/whatsapp-mcp-arm64-macos.tar.gz"
+    sha256 "22237b0fe917cda3616e012adf76019e0b56529f6228f3efc68862304a2ff1e7"
   end
 
   on_linux do
-    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.1/whatsapp-mcp-x64-linux.tar.gz"
-    sha256 "f94bb04fee27edf044d411e5d6d5f8702c9c74b23c5c8ee09c4c2e8b6ab1695c"
+    url "https://github.com/bdombro/whatsapp-mcp/releases/download/v3.1.2/whatsapp-mcp-x64-linux.tar.gz"
+    sha256 "95947d013ec2390afe25e198c1cbb1f6face377498df295eb561d101bc4c1fbf"
   end
 
   license "MIT"

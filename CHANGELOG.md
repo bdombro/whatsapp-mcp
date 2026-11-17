@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v3.1.2 - 2026-11-17
+
+- feat: server-only CLI, /tools HTTP surface, and cpp-templates alignment (#1)
+  * docs: use VCPKG_OVERLAY_PORTS for unreleased libs
+  * chore: guard release against VCPKG_OVERLAY_PORTS
+  * ci: align workflows, contributing docs, and release scripts with cpp-templates
+  * docs: maintainer setup for release App, secrets, rulesets
+  * docs: soft alignment marker and release-bot contributing docs
+  * feat: server-only CLI, /tools HTTP surface, and OAuth audience parity
+  * chore: bump slimr-serve and slimr-mcp baselines
+- chore: slow gh run watch polling to 30s
+
 - Drop per-tool CLI from `whatsapp-mcp` (server-only `http` mode); move HTTP tool routes and OpenAPI spec from root (`/openapi.json`, `/<tool>`) to `/tools/<tool>` and `/tools/openapi.json` (on by default) with `/mcp` OAuth audience parity
 
 ## v3.1.1 - 2026-11-17
